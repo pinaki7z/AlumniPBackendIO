@@ -207,6 +207,73 @@ alumniRoutes.post(
   }
 );
 
+alumniRoutes.post("/login/mobile", async (req, res) => {
+  const { email, password} = req.body;
+
+  try {
+    // const captchaVerifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${process.env.RECAPTCHA_SECRET}&response=${captchaToken}`;
+
+    // const captchaResponse = await axios.post(captchaVerifyUrl);
+    // if (!captchaResponse.data.success) {
+    //   return res
+    //     .status(400)
+    //     .json("reCAPTCHA validation failed. Please try again.");
+    // }
+    const alumni = await Alumni.findOne({ email: email });
+
+    if (!alumni) {
+      return res.status(404).json("Alumni not found");
+    }
+
+    if (alumni.accountDeleted === true && alumni.validated !== false) {
+      return res
+        .status(404)
+        .json("Account has been Deleted. Contact Admin to recover");
+    } else if (alumni.validated === false) {
+      return res
+        .status(404)
+        .json("Your ID validation was rejected. Contact Admin to recover");
+    }
+
+    let passwordMatch = false;
+
+    if (alumni.password.startsWith("$2")) {
+      passwordMatch = await bcrypt.compare(password, alumni.password);
+    } else {
+      passwordMatch =
+        password === alumni.password ||
+        (await bcrypt.compare(password, alumni.password));
+    }
+
+    if (passwordMatch) {
+      const encrypted = await bcrypt.hash(password, 10);
+      alumni.password = encrypted;
+      await alumni.save();
+      const token = jwt.sign(
+        {
+          userId: alumni._id,
+          username: alumni.firstName,
+          email: email,
+          password: password,
+        },
+        secretKey
+      );
+
+      return res.status(201).send({
+        message: "Session created successfully and Login Successful",
+        token: token,
+        alumni: alumni,
+      });
+    } else {
+      return res.status(401).json("Invalid password");
+    }
+  } catch (err) {
+    console.error("Error finding user:", err);
+    return res.status(500).send("Internal Server Error");
+  }
+});
+
+
 alumniRoutes.post("/login", async (req, res) => {
   const { email, password, captchaToken } = req.body;
 
