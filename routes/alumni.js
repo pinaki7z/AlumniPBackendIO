@@ -43,6 +43,171 @@ const generateOTP = () => {
 };
 
 alumniRoutes.post(
+  "/register/mobile",
+  validateEmail,
+  validatePassword,
+  async (req, res) => {
+    const {
+      firstName,
+      lastName,
+      graduation_year,
+      graduation_degree,
+      email,
+      mobile,
+      password,
+      dob,
+      captchaToken,
+      gender,
+      profile,
+      graduatedFromClass,
+      graduatingYear,
+      designation,
+      isActive,
+      isPopular,
+      isNewest,
+      picturePath,
+      friends,
+      location,
+      occupation,
+      workingAt,
+      companyWebsite,
+      aboutMe,
+      city,
+      department,
+      batch,
+      country,
+      following,
+      followers,
+      admin,
+      alumni,
+      student,
+      specialRole,
+      appliedJobs,
+      linkedIn,
+      expirationDate,
+    } = req.body;
+    let { otp, status, profileLevel } = req.body;
+
+    try {
+      // const captchaVerifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${process.env.RECAPTCHA_SECRET}&response=${captchaToken}`;
+
+      // const captchaResponse = await axios.post(captchaVerifyUrl);
+      // if (!captchaResponse.data.success) {
+      //   return res
+      //     .status(400)
+      //     .json("reCAPTCHA validation failed. Please try again.");
+      // }
+      // Check if the username already exists in the database
+      const existingAlumni = await Alumni.findOne({ email });
+      if (existingAlumni) {
+        return res.status(409).send("Email already registered");
+      }
+
+      const encrypted = await bcrypt.hash(password, 10);
+      otp = generateOTP();
+
+      const currentDate = new Date();
+      let newExpirationDate = null; // Initialize expirationDate variable
+
+      // Set expirationDate only if admin is not true
+      if (!admin) {
+        newExpirationDate = new Date(currentDate);
+        newExpirationDate.setDate(currentDate.getDate() + 7);
+      }
+
+      const profileLevelValue = admin
+        ? 1
+        : alumni
+        ? 2
+        : student
+        ? 3
+        : specialRole
+        ? 4
+        : null;
+
+      const newAlumni = new Alumni({
+        firstName,
+        lastName,
+        graduation_year,
+        graduation_degree,
+        email,
+        mobile,
+        password: encrypted,
+        gender,
+        profile,
+        designation,
+        otp,
+        status,
+        profileLevel: profileLevelValue,
+        isActive,
+        isPopular,
+        isNewest,
+        picturePath,
+        friends,
+        location,
+        occupation,
+        workingAt,
+        companyWebsite,
+        aboutMe,
+        linkedIn,
+        department,
+        batch: batch ? batch : null,
+        city,
+        accountDeleted: false,
+        country,
+        following,
+        followers,
+        graduatedFromClass,
+        graduatingYear,
+        blockedContactsId: null,
+        admin: admin ? admin : false,
+        appliedJobs,
+        expirationDate: newExpirationDate,
+      });
+
+      await newAlumni.save();
+
+      if (admin !== undefined) {
+        console.log("admin is not undefined");
+        const transporter = nodemailer.createTransport({
+          host: "smtp.gmail.com",
+          port: 587,
+          auth: {
+            user: "nandannandu254@gmail.com",
+            pass: "hbpl hane patw qzqb",
+          },
+        });
+
+        let message = {
+          from: "nandannandu254@gmail.com",
+          to: email,
+          subject: "Alumni Portal Login Credentials",
+          text: `Your Alumni Portal Login Credentials are:
+               email : ${email}
+               password : ${password} `,
+        };
+
+        transporter.sendMail(message, (err, info) => {
+          if (err) {
+            console.log("Error occurred. " + err.message);
+            return process.exit(1);
+          }
+
+          console.log("Message sent: %s", info.messageId);
+          // Preview only available when sending through an Ethereal account
+          console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
+        });
+      }
+
+      return res.status(201).send("Alumni registered successfully");
+    } catch (error) {
+      console.error("Error registering alumni:", error);
+      return res.status(500).send("Internal Server Error");
+    }
+  }
+);
+
+alumniRoutes.post(
   "/register",
   validateEmail,
   validatePassword,
