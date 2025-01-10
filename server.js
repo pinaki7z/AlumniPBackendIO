@@ -48,7 +48,7 @@ app.use(bodyParser.urlencoded({ extended: true, limit: "100mb" }));
 app.use(bodyParser.json({ extended: true, limit: "100mb" }));
 app.use(
   cors({
-    origin: ["http://localhost:3000", "https://alumni-frontend-4ca1.vercel.app","https://alumni-p-eps.vercel.app","https://api.excelpublicschool.com","https://api.excelpublicschool.com/alumni/login","https://api.excelpublicschool.com/settings/","https://alumni.excelpublicschool.com"],
+    origin: ["http://localhost:3000", "https://alumni-frontend-4ca1.vercel.app","https://alumni-p-eps.vercel.app","https://api.excelpublicschool.com","https://api.excelpublicschool.com/alumni/login","https://api.excelpublicschool.com/settings/","https://alumni.excelpublicschool.com","https://alumnify.in"],
     credentials: true,
   })
 );
