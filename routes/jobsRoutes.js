@@ -40,7 +40,7 @@ const fileFilter = (req, file, cb) => {
 // Multer upload middleware
 const upload = multer({ storage: storage, fileFilter: fileFilter });
 
-jobRoutes.post("/create",async (req, res) => {
+jobRoutes.post("/create", async (req, res) => {
   try {
     const {
       userId,
@@ -61,15 +61,15 @@ jobRoutes.post("/create",async (req, res) => {
       attachments,
       locationType,
       profilePicture,
-      verified
+      verified,
     } = req.body;
-    console.log('body')
 
-    console.log("request body", req.body);
+    console.log("Request body:", req.body);
 
-    //const attachmentNames = req.files.map((file) => file.filename);
+    let savedItem;
+
     if (type === "Job") {
-      console.log("job post");
+      console.log("Creating a job post");
       const newJob = new Job({
         userId,
         title,
@@ -92,37 +92,14 @@ jobRoutes.post("/create",async (req, res) => {
         locationType,
         userName,
         profilePicture,
-        verified
+        verified,
       });
 
-      const savedJob = await newJob.save();
-      console.log('job saved', savedJob)
+      savedItem = await newJob.save();
+      console.log("Job saved:", savedItem);
 
-      // const alumni = await Alumni.findOne({ _id: userId });
-      // const admin = await Alumni.findOne({
-      //   profileLevel: 1,
-      //   department: alumni.department,
-      // });
-
-      // if (admin) {
-      //   const newNotification = new Notification({
-      //     userId: userId,
-      //     requestedUserName: alumni.firstName,
-      //     ownerId: admin._id,
-      //     status: false,
-      //     job: true,
-      //     jobId: savedJob._id,
-      //   });
-      //   await newNotification.save();
-      // } else {
-      //   console.error("Admin not found for the department");
-      //   await Job.deleteOne({ _id: savedJob._id });
-      //   return res
-      //     .status(400)
-      //     .json({ error: "Admin not found for the department" });
-      // }
     } else if (type === "Internship") {
-      console.log("internship post");
+      console.log("Creating an internship post");
       const newInternship = new Internship({
         userId,
         title,
@@ -145,42 +122,30 @@ jobRoutes.post("/create",async (req, res) => {
         approved: false,
         userName,
         profilePicture,
-        verified
+        verified,
       });
-      const savedInternship = await newInternship.save();
 
-      // const alumni = await Alumni.findOne({ _id: userId });
-      // const admin = await Alumni.findOne({
-      //   profileLevel: 1,
-      //   department: alumni.department,
-      // });
-
-      // if (admin) {
-      //   const newNotification = new Notification({
-      //     userId: userId,
-      //     requestedUserName: alumni.firstName,
-      //     ownerId: admin._id,
-      //     status: false,
-      //     job: false,
-      //     jobId: savedInternship._id,
-      //   });
-      //   await newNotification.save();
-      // } else {
-      //   console.error("Admin not found for the department");
-
-      //   await Internship.deleteOne({ _id: savedInternship._id });
-      //   return res
-      //     .status(400)
-      //     .json({ error: "Admin not found for the department" });
-      // }
+      savedItem = await newInternship.save();
+      console.log("Internship saved:", savedItem);
+    } else {
+      console.error("Invalid type:", type);
+      return res.status(400).json({ error: "Invalid type. Must be 'Job' or 'Internship'." });
     }
-    console.log('finish')
-    return res.status(201).json({ message: "Success" });
+
+    if (!savedItem) {
+      console.error("Failed to save item");
+      return res.status(500).json({ error: "Failed to save job or internship." });
+    }
+
+    console.log("Finish");
+    return res.status(201).json({ message: "Success", data: savedItem });
+
   } catch (error) {
-    console.error("Error creating job:", error);
+    console.error("Error creating job or internship:", error);
     return res.status(500).json({ error: error.message });
   }
 });
+
 
 jobRoutes.get("/", async (req, res) => {
   try {
