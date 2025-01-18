@@ -114,7 +114,7 @@ newsRoutes.post("/create", upload.single("videoPath"), async (req, res) => {
 //   }
 // });
 
-newsRoutes.get("/:_id", async (req, res) => {
+newsRoutes.get("/news/:_id", async (req, res) => {
   try {
     const news = await News.findById(req.params._id);
 
