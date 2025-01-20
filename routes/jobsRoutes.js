@@ -338,7 +338,7 @@ jobRoutes.post("/apply/:_id", upload.single("resume"), async (req, res) => {
   }
 
   try {
-    const internship = await Internship.findOneAndUpdate(
+    const job = await Job.findOneAndUpdate(
       { _id },
       {
         $push: {
@@ -354,8 +354,8 @@ jobRoutes.post("/apply/:_id", upload.single("resume"), async (req, res) => {
       { new: true }
     );
 
-    if (!internship) {
-      return res.status(404).json({ message: "Internship post not found" });
+    if (!job) {
+      return res.status(404).json({ message: "Job post not found" });
     }
 
     const user = await Alumni.findByIdAndUpdate(
