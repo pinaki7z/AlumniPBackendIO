@@ -62,6 +62,7 @@ jobRoutes.post("/create", async (req, res) => {
       locationType,
       profilePicture,
       verified,
+      applyBy
     } = req.body;
 
     console.log("Request body:", req.body);
@@ -86,6 +87,7 @@ jobRoutes.post("/create", async (req, res) => {
         coverImage,
         attachments,
         type,
+        applyBy,
         archive: false,
         starred: [],
         approved: false,
@@ -108,6 +110,7 @@ jobRoutes.post("/create", async (req, res) => {
         category,
         employmentType,
         duration,
+        applyBy,
         currency,
         salaryMin,
         salaryMax,

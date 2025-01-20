@@ -11,6 +11,7 @@ const internshipsSchema = new mongoose.Schema({
   location: String,
   salaryMin: Number,
   company: String,
+  applyBy: String,
   salaryMax: Number,
   picture: String,
   currency: String,

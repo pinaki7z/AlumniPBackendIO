@@ -9,6 +9,7 @@ const jobsSchema = new mongoose.Schema({
   profilePicture: String,
   title:String,
   location:String,
+  applyBy: String,
   company: String,
   salaryMin: Number,
   salaryMax: Number,
