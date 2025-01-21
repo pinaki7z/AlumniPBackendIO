@@ -39,6 +39,14 @@ const postSchema = mongoose.Schema(
     userName: String,
     groupID: String,
     archive: Boolean,
+    blockedUserIds: [{
+      userId: String,
+      content: String,
+      commentId: String,
+      expiryDate: Date,
+      userName: String,
+      sent: Boolean
+    }],
     description: String,
     picturePath: [String],
     profilePicture: String,

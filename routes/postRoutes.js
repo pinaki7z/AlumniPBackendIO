@@ -245,6 +245,22 @@ postRoutes.get('/', async (req, res) => {
   }
 });
 
+postRoutes.get("/:_id/blockedUserIds", async (req, res) => {
+  const { _id } = req.params;
+
+  try {
+    const post = await Post.findById(_id);
+    if (!post) {
+      return res.status(404).json({ message: "post not found" });
+    }
+
+    const blockedUserIds = post.blockedUserIds;
+    res.status(200).json({ blockedUserIds });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 postRoutes.get('/posts/archive', async (req, res) => {
   try {
     const size = parseInt(req.query.size) || 4; 
@@ -276,7 +292,7 @@ postRoutes.put("/:_id/report", async (req, res) => {
 
   try {
     const post = await Post.findById(_id);
-    console.log("forum", post);
+    // console.log("forum", post);
     if (!post) {
       return res.status(404).json({ message: "post not found" });
     }
@@ -308,6 +324,7 @@ postRoutes.put("/:_id/report", async (req, res) => {
     };
 
     const reportedComment = findCommentById(commentId, post.comments);
+    console.log('reported comment ', reportedComment)
 
     // Check if the commentId already exists in the blockedUserIds array
     const existingBlockedComment = post.blockedUserIds.find(
