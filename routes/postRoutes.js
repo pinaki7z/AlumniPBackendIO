@@ -270,6 +270,63 @@ postRoutes.get('/posts/archive', async (req, res) => {
   }
 });
 
+postRoutes.put("/:_id/report", async (req, res) => {
+  const { commentId, userId } = req.body;
+  const { _id } = req.params;
+
+  try {
+    const post = await Post.findById(_id);
+    console.log("forum", post);
+    if (!post) {
+      return res.status(404).json({ message: "post not found" });
+    }
+
+    const findCommentById = (commentId, commentsArray) => {
+      for (let i = 0; i < commentsArray.length; i++) {
+        const comment = commentsArray[i];
+        if (comment._id.equals(commentId)) {
+          // Set the 'reported' field of the comment to true
+          comment.reported = true;
+          const expiryDate = new Date();
+          expiryDate.setDate(expiryDate.getDate() + 30);
+          return {
+            content: comment.content,
+            commentId: comment._id,
+            userId: userId,
+            expiryDate: expiryDate,
+            userName: comment.userName,
+            sent: false,
+          };
+        }
+
+        if (comment.comments.length > 0) {
+          const result = findCommentById(commentId, comment.comments);
+          if (result) return result;
+        }
+      }
+      return null;
+    };
+
+    const reportedComment = findCommentById(commentId, post.comments);
+
+    // Check if the commentId already exists in the blockedUserIds array
+    const existingBlockedComment = post.blockedUserIds.find(
+      (item) => item.commentId.toString() === commentId.toString()
+    );
+    if (!existingBlockedComment && reportedComment) {
+      post.blockedUserIds.push(reportedComment);
+    }
+
+    // Save the updated post
+    const updatedPost = await post.save();
+
+    // Respond with the updated post
+    res.status(200).json(updatedPost);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 postRoutes.put("/:_id",upload.single("videoPath"), async (req, res) => {
   const { userId, description,picturePath,groupID,profilePicture } = req.body;
 
