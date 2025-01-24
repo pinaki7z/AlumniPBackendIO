@@ -67,7 +67,8 @@ newsRoutes.post("/create", upload.single("videoPath"), async (req, res) => {
       description,
       videoPath,
       department,
-      createdAt: creationDate
+      createdAt: creationDate,
+      type: "news"
     });
     await newNews.save();
 
