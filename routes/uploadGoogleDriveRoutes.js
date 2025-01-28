@@ -13,7 +13,7 @@ uploadGoogleDriveRoutes.post('/', async (req, res) => {
 
         // If no alumni with profileLevel === 1 is found, look for profileLevel === 0
         if (!owner) {
-            owner = await Alumni.findOne({ department, profileLevel: 0 });
+            owner = await Alumni.findOne({profileLevel: 0 });
         }
 
         // If no owner is found, return an error message
