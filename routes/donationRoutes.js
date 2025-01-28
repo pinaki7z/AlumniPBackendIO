@@ -119,33 +119,36 @@ donationRoutes.delete("/:_id", async (req, res) => {
   }
 });
 
-donationRoutes.put("/:_id", async (req, res) => {
+donationRoutes.put("/:_id", upload.single('businessPlan'), async (req, res) => {
   const updatedData = req.body;
-  //const { start, end, startTime, endTime, picture } = updatedData;
 
   try {
     const donation = await Donation.findById(req.params._id);
 
     if (!donation) {
       console.error("No such donation");
-      return res.status(404).send("donation not found");
+      return res.status(404).send("Donation not found");
     }
 
-    // const istStartDate = new Date(start).toISOString(); // Store with timezone offset
-    // const istEndDate = new Date(end).toISOString(); // Store with timezone offset
+    // If a new businessPlan file is uploaded, update the filename
+    if (req.file) {
+      console.log('Uploaded file:', req.file);
+      updatedData.businessPlan = req.file.filename;
+    }
 
-    // updatedData.start = istStartDate; // Store with timezone offset
-    // updatedData.end = istEndDate; // Store with timezone offset
-
+    // Update the donation object with new data
     Object.assign(donation, updatedData);
+
+    // Save the updated donation object
     await donation.save();
 
-    return res.status(200).send("donation updated successfully");
+    return res.status(200).send("Donation updated successfully");
   } catch (error) {
     console.error("Error occurred:", error);
     return res.status(500).send("Internal Server Error");
   }
 });
+
 
 donationRoutes.get("/user/:_id", async (req, res) => {
   const userId = req.params._id; 
