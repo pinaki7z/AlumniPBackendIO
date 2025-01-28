@@ -28,6 +28,7 @@ uploadGoogleDriveRoutes.post('/', async (req, res) => {
             link,
             userId,
             ownerId,
+            department,
             status: false,
             requestedUserName
         });

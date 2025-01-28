@@ -39,6 +39,7 @@ const NotificationSchema = new mongoose.Schema({
   ID: String, 
   job: Boolean,
   jobId: String,
+  department: String,
   commentId: String,
   comment: String,
   follow: Boolean,

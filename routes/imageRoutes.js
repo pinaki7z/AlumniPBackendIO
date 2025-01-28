@@ -92,13 +92,14 @@ imageRoutes.post("/getImagesFromFolder", async (req, res) => {
   });
 
 imageRoutes.post('/addLink', async (req, res) => {
-    const { notificationId, link, userId } = req.body;
+    const { notificationId, link, userId,department} = req.body;
   
     try {
       // 1. Add the link to the Image collection
       const newImage = new Image({
         link,
         addedBy: userId,
+        department
       });
       await newImage.save();
   
