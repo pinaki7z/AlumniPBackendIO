@@ -51,7 +51,7 @@ const getImagesFromFolder = async (folderId) => {
 imageRoutes.get("/getGoogleDriveFolders", async (req, res) => {
   try {
     const folders = await Image.find()
-      .select("link date -_id") // Fetch only the `link` field
+      .select("link createdAt date -_id") // Fetch only the `link` field
       .sort({ createdAt: -1 }); // Sort in descending order by `createdAt`
       const formattedFolders = folders.map((folder) => ({
         link: folder.link,
