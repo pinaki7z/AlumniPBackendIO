@@ -55,7 +55,7 @@ imageRoutes.get("/getGoogleDriveFolders", async (req, res) => {
       .sort({ createdAt: -1 }); // Sort in descending order by `createdAt`
       const formattedFolders = folders.map((folder) => ({
         link: folder.link,
-        date: folder.date // Rename to `date`
+        date: folder.createdAt // Rename to `date`
       }));
   
       res.status(200).json({ folders: formattedFolders });
