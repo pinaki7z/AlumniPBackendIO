@@ -270,6 +270,29 @@ forumRoutes.put("/members/:_id", async (req, res) => {
   }
 });
 
+forumRoutes.put("/edit/:id", async (req, res) => {
+  try {
+    const { title, description, picture, type } = req.body;
+    const forumId = req.params.id;
+
+    // Find the forum by ID and update
+    const updatedForum = await Forum.findByIdAndUpdate(
+      forumId,
+      { title, description, picture, type },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedForum) {
+      return res.status(404).json({ message: "Forum not found" });
+    }
+
+    res.status(200).json({ message: "Forum updated successfully", forum: updatedForum });
+  } catch (error) {
+    console.error("Error updating forum:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 forumRoutes.get("/:_id/members", async (req, res) => {
   try {
     const { _id } = req.params;
