@@ -509,7 +509,7 @@ alumniRoutes.get("/all", async (req, res) => {
   try {
     const alumni = await Alumni.find()
       .select(
-        "firstName lastName profilePicture profileLevel _id email workExperience accountDeleted graduatingYear class groupNames linkedIn department batch aboutMe"
+        "firstName lastName profilePicture profileLevel _id email workExperience accountDeleted graduatingYear class groupNames linkedIn department batch aboutMe followers following"
       )
       .lean();
     if (!alumni.length) {
