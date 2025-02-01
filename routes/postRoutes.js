@@ -22,7 +22,7 @@ const mergeSortAndPaginate = async (page, size) => {
   const [posts, jobs, polls, events] = await Promise.all([
     Post.find({ groupID: { $exists: false }, $or: [{ archive: false }, { archive: { $exists: false } }] })
       .sort({ createdAt: -1 }),
-    Internship.find({ groupID: { $exists: false }, $or: [{ archive: false }, { archive: { $exists: false } }] })
+    Job.find({ groupID: { $exists: false }, $or: [{ archive: false }, { archive: { $exists: false } }] })
       .sort({ createdAt: -1 }),
     Poll.find({ groupID: { $exists: false }, $or: [{ archive: false }, { archive: { $exists: false } }] })
       .sort({ createdAt: -1 }),
