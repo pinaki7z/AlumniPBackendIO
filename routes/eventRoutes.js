@@ -103,12 +103,20 @@ eventRoutes.post("/createEvent", async (req, res) => {
         userId,
         groupName: title,
         createdAt: new Date(),
-        members: [userId],
+        members: [
+          {
+            userId: user._id,
+            profilePicture: user.profilePicture,
+            userName: `${user.firstName} ${user.lastName}`,
+            profileLevel: user.profileLevel,
+          },
+        ],
         groupType: "Private",
         category: "Event",
         businessConnect: false,
         department: "All",
       });
+      
 
       await Alumni.updateMany(
         { _id: { $in: userId } },
