@@ -8,7 +8,7 @@ const Sponsorship = require("../models/sponsorship");
 const sponsorshipRoutes = express.Router();
 
 sponsorshipRoutes.post("/create", async (req, res) => {
-  const { userId,nameOfOrganiser,emailOfOrganiser, nameOfEvent, sponsorshipAmount, targetAudience,sponsorshipBenefits,useOfFunds,additionalInfo,eventDate,eventDescription,expectedAttendees,location,number} = req.body;
+  const { userId,nameOfOrganiser,emailOfOrganiser, nameOfEvent, sponsorshipAmount, targetAudience,sponsorshipBenefits,useOfFunds,additionalInfo,eventDate,eventDescription,expectedAttendees,location,number,picturePath} = req.body;
   console.log('request body',req.body)
   try {
     const currentDate = new Date();

@@ -17,7 +17,8 @@ const sponsorshipSchema = new mongoose.Schema({
     eventDescription: String,
     expectedAttendees: Number,
     location: String,
-    number: Number
+    number: Number,
+    picturePath: String
 });
 
 const Sponsorship = mongoose.model('Sponsorship', sponsorshipSchema);
