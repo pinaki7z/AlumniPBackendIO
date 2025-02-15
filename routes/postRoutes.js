@@ -134,49 +134,19 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// postRoutes.post("/create", upload.single("videoPath"), async (req, res) => {
-//   try {
-//     const { userId, description,picturePath,groupID,profilePicture } = req.body;
-//     const folderName= req.query.folder;
-//     const alumni = await Alumni.findById(userId);
-//     let videoPath = null;
- 
-//     if (req.file) {
-//       videoPath = {
-//         videoPath: `http://localhost:3000/uploads/${folderName}/${req.file.originalname}`,
-//         name: req.file.filename,
-//       };
-//     }
-
-//     const newPost = new Post({
-//       userId,
-//       firstName: alumni.firstName,
-//       lastName: alumni.lastName,
-//       location: alumni.location,
-//       picturePath,
-//       profilePicture,
-//       description,
-//       videoPath,
-//       groupID,
-//       likes: [],
-//       comments: [],
-//       archive: false,
-//       type: 'Post'
-//     });
-//     await newPost.save();
-
-//     const post = await Post.find();
-//     res.status(201).json(post);
-//   } catch (err) {
-//     res.status(409).json({ message: err.message });
-//   }
-// });
-
-postRoutes.post("/create", async (req, res) => {
+postRoutes.post("/create", upload.single("videoPath"), async (req, res) => {
   try {
-    const { userId, description,picturePath,groupID,profilePicture,videoPath } = req.body;
+    const { userId, description,picturePath,groupID,profilePicture } = req.body;
     const folderName= req.query.folder;
     const alumni = await Alumni.findById(userId);
+    let videoPath = null;
+ 
+    if (req.file) {
+      videoPath = {
+        videoPath: `http://localhost:3000/uploads/${folderName}/${req.file.originalname}`,
+        name: req.file.filename,
+      };
+    }
 
     const newPost = new Post({
       userId,
@@ -195,12 +165,44 @@ postRoutes.post("/create", async (req, res) => {
     });
     await newPost.save();
 
-    // const post = await Post.find();
-    res.status(201).json(newPost);
+    const post = await Post.find();
+    res.status(201).json(post);
   } catch (err) {
     res.status(409).json({ message: err.message });
   }
 });
+
+// postRoutes.post("/create", async (req, res) => {
+//   try {
+//     const { userId, description,picturePath,groupID,profilePicture,videoPath } = req.body;
+//     console.log('userId:', userId, 'Type:', typeof userId);
+
+//     const folderName= req.query.folder;
+//     const alumni = await Alumni.findById(userId);
+
+//     const newPost = new Post({
+//       userId,
+//       firstName: alumni.firstName,
+//       lastName: alumni.lastName,
+//       location: alumni.location,
+//       picturePath,
+//       profilePicture,
+//       description,
+//       videoPath,
+//       groupID,
+//       likes: [],
+//       comments: [],
+//       archive: false,
+//       type: 'Post'
+//     });
+//     await newPost.save();
+
+//     // const post = await Post.find();
+//     res.status(201).json(newPost);
+//   } catch (err) {
+//     res.status(409).json({ message: err.message });
+//   }
+// });
 
 postRoutes.get("/:_id", async (req, res) => {
   try {
