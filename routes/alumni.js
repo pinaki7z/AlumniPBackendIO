@@ -1302,4 +1302,48 @@ alumniRoutes.post(
   }
 );
 
+alumniRoutes.put("/delete/profilePicture", async (req, res) => {
+  try {
+    const { userId } = req.body; // Assuming user ID is available from the auth middleware
+
+    // Find the user and update the profile picture to null or default value
+    const updatedUser = await Alumni.findByIdAndUpdate(
+      userId,
+      { profilePicture: null }, // or set a default profile picture URL if needed
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({ message: "Profile picture deleted successfully", user: updatedUser });
+  } catch (error) {
+    console.error("Error deleting profile picture:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+alumniRoutes.put("/delete/coverPicture", async (req, res) => {
+  try {
+    const { userId } = req.body; // Assuming user ID is available from the auth middleware
+
+    // Find the user and update the profile picture to null or default value
+    const updatedUser = await Alumni.findByIdAndUpdate(
+      userId,
+      { coverPicture: null }, // or set a default profile picture URL if needed
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({ message: "Cover picture deleted successfully", user: updatedUser });
+  } catch (error) {
+    console.error("Error deleting profile picture:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 module.exports = alumniRoutes;
