@@ -9,6 +9,7 @@ const commentSchema = new mongoose.Schema({
   profilePicture: {
     type: String,
   },
+  reported: Boolean,
   content: {
     type: String,
   },
