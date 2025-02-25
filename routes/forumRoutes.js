@@ -229,46 +229,60 @@ forumRoutes.put("/members/:_id", async (req, res) => {
     if (notificationId) {
       await Notification.findByIdAndDelete(notificationId);
     }
+
     const forum = await Forum.findById(_id);
-    if (!forum) {
-      console.error("No such forum");
-      return res.status(404).send("Forum not found");
+    if (!forum) return res.status(404).send("Forum not found");
+
+    // Ensure userId is always an array for consistent handling
+    const cleanedUserIds = Array.isArray(userId) ? userId : [userId];
+
+    let updatedUsers = [];
+    let skippedUsers = [];
+
+    for (let cleanedUserId of cleanedUserIds) {
+      const user = await Alumni.findById(cleanedUserId);
+      if (!user) {
+        skippedUsers.push(cleanedUserId);
+        continue;
+      }
+
+      // Prevent removing the forum owner
+      if (forum.userId.toString() === cleanedUserId) {
+        skippedUsers.push(cleanedUserId);
+        continue;
+      }
+
+      const userIndex = forum.members.indexOf(cleanedUserId);
+
+      if (userIndex !== -1) {
+        forum.members.splice(userIndex, 1);
+        const groupIndex = user.forumNames.indexOf(_id);
+        if (groupIndex !== -1) {
+          user.forumNames.splice(groupIndex, 1);
+        }
+      } else {
+        forum.members.push(cleanedUserId);
+        user.forumNames.push(_id);
+        updatedUsers.push(cleanedUserId);
+      }
+
+      await user.save();
     }
 
-    const user = await Alumni.findById(userId);
-    if (!user) {
-      console.error("No such user");
-      return res.status(404).send("User not found");
-    }
-
-    const userIndex = forum.members.indexOf(userId);
-    let isUserAdded;
-
-    if (userIndex !== -1) {
-      forum.members.splice(userIndex, 1);
-      isUserAdded = false;
-    } else {
-      forum.members.push(userId);
-      isUserAdded = true;
-    }
     await forum.save();
 
-    const groupIndex = user.forumNames.indexOf(_id);
-    if (groupIndex !== -1) {
-      user.forumNames.splice(groupIndex, 1);
-    } else {
-      user.forumNames.push(_id);
-    }
-    await user.save();
-
-    return res
-      .status(200)
-      .json({ message: "Forum updated successfully", isUserAdded });
+    return res.status(200).json({
+      message: "Forum updated successfully",
+      updatedUsers,
+      skippedUsers, // Users who were not removed (including the forum owner)
+    });
   } catch (error) {
     console.error("Error occurred:", error);
     return res.status(500).send("Internal Server Error");
   }
 });
+
+
 
 forumRoutes.put("/edit/:id", async (req, res) => {
   try {
