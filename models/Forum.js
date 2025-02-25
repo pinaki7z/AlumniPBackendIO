@@ -36,7 +36,12 @@ const forumSchema = new mongoose.Schema({
   picture: String,
   department: String,
   video: String,
-  members: [String],
+  members: [
+    {
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: "Alumni",
+    },
+  ],
   totalTopics: Number,
   createdAt: Date,
   type: String,
