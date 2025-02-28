@@ -59,7 +59,7 @@ app.use(bodyParser.json({ extended: true, limit: "100mb" }));
 app.use("/uploads",express.static(__dirname + "/uploads"))
 app.use(
   "/uploads",
-  express.static(path.join(__dirname, "../AlumniFrontend/AlumniFrontendD/public/uploads"))
+  express.static(path.join(__dirname, "../AlumniFrontendD/public/uploads"))
 );
 db.once("open", () => {
   console.log('directory name',__dirname)

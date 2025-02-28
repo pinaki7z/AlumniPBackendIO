@@ -114,7 +114,7 @@ const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
     const folderName = req.query.folder || "default";
     const uploadPath = path.join(
-      `D:/test/AlumniFrontend/AlumniFrontendD/public/uploads`,
+      `/home/ubuntu/AlumniFrontendD/public/uploads`,
       folderName
     );
     console.log("uploadpath:", uploadPath);
@@ -143,7 +143,7 @@ postRoutes.post("/create", upload.single("videoPath"), async (req, res) => {
  
     if (req.file) {
       videoPath = {
-        videoPath: `http://localhost:3000/uploads/${folderName}/${req.file.originalname}`,
+        videoPath: `https://alumnify.in/uploads/${folderName}/${req.file.originalname}`,
         name: req.file.filename,
       };
     }
