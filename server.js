@@ -53,7 +53,7 @@ app.use(
   })
 );
 //app.use(cors());
-
+console.log('directory name',__dirname)
 
 app.use(bodyParser.json({ extended: true, limit: "100mb" }));
 app.use("/uploads",express.static(__dirname + "/uploads"))
@@ -62,7 +62,6 @@ app.use(
   express.static(path.join(__dirname, "../AlumniFrontendD/public/uploads"))
 );
 db.once("open", () => {
-  console.log('directory name',__dirname)
   console.log("Connected to MongoDB");
 });
 db.on("error", console.error.bind(console, "MongoDB connection error:"));

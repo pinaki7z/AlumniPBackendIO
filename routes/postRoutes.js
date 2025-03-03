@@ -108,31 +108,57 @@ const mergeSortAndPaginateUser = async (page,size,id) => {
 
 
 
-
-
 const storage = multer.diskStorage({
-  destination: async (req, file, cb) => {
-    const folderName = req.query.folder || "default";
-    const uploadPath = path.join(
-      `/home/ubuntu/AlumniFrontendD/public/uploads`,
-      folderName
-    );
-    console.log("uploadpath:", uploadPath);
-
-    try {
-      await fs.promises.mkdir(uploadPath, { recursive: true });
-      cb(null, uploadPath);
-    } catch (err) {
-      cb(err, null);
-    }
+  destination: (req, file, cb) => {
+    cb(null, "uploads/"); 
   },
   filename: (req, file, cb) => {
-    // const uniqueFilename = Date.now() + "-" + file.originalname;
-    cb(null, file.originalname);
+    cb(null, Date.now() + path.extname(file.originalname));
   },
 });
 
-const upload = multer({ storage });
+
+const fileFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith("video/")) {
+    cb(null, true);
+  } else {
+    cb(new Error("Only videos are allowed!"), false);
+  }
+};
+
+// Multer upload configuration
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit
+});
+
+
+
+
+// const storage = multer.diskStorage({
+//   destination: async (req, file, cb) => {
+//     const folderName = req.query.folder || "default";
+//     const uploadPath = path.join(
+//       `D:/test/AlumniFrontend/AlumniFrontendD/public/uploads`,
+//       folderName
+//     );
+//     console.log("uploadpath:", uploadPath);
+
+//     try {
+//       await fs.promises.mkdir(uploadPath, { recursive: true });
+//       cb(null, uploadPath);
+//     } catch (err) {
+//       cb(err, null);
+//     }
+//   },
+//   filename: (req, file, cb) => {
+//     // const uniqueFilename = Date.now() + "-" + file.originalname;
+//     cb(null, file.originalname);
+//   },
+// });
+
+//const upload = multer({ storage });
 
 postRoutes.post("/create", upload.single("videoPath"), async (req, res) => {
   try {
@@ -143,7 +169,8 @@ postRoutes.post("/create", upload.single("videoPath"), async (req, res) => {
  
     if (req.file) {
       videoPath = {
-        videoPath: `https://alumnify.in/uploads/${folderName}/${req.file.originalname}`,
+        // videoPath: `http://localhost:3000/uploads/${folderName}/${req.file.originalname}`,
+        videoPath: `uploads/${req.file.filename}`,
         name: req.file.filename,
       };
     }
@@ -154,7 +181,7 @@ postRoutes.post("/create", upload.single("videoPath"), async (req, res) => {
       lastName: alumni.lastName,
       location: alumni.location,
       picturePath,
-      profilePicture,
+      profilePicture,       
       description,
       videoPath,
       groupID,
