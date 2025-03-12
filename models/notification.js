@@ -43,6 +43,9 @@ const NotificationSchema = new mongoose.Schema({
   commentId: String,
   comment: String,
   follow: Boolean,
+  commented: Boolean,
+  postId: String,
+  postUserId: String
 },
 { timestamps: true });
 

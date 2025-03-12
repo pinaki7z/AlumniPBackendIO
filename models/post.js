@@ -51,6 +51,9 @@ const postSchema = mongoose.Schema(
     description: String,
     picturePath: [String],
     profilePicture: String,
+    postUserId: {
+      type: String
+    },
     likes: [
       {
         userId: {

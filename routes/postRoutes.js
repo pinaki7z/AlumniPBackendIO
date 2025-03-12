@@ -14,6 +14,7 @@ const Job = require("../models/job");
 const Poll = require("../models/poll");
 const Event = require("../models/Events");
 const mongoose = require('mongoose');
+const Notification = require("../models/notification");
 
 const postRoutes = express.Router();
 
@@ -592,7 +593,7 @@ postRoutes.patch("/:_id/clap", async (req, res) => {
 postRoutes.post("/:_id/comments", async (req, res) => {
   try {
     const { _id } = req.params;
-    const { userId, content, userName, parentCommentId,profilePicture } = req.body;
+    const { userId, content, userName, parentCommentId,profilePicture,postUserId } = req.body;
 
     
     const post = await Post.findById(_id);
@@ -600,7 +601,7 @@ postRoutes.post("/:_id/comments", async (req, res) => {
       return res.status(404).json({ message: "post not found" });
     }
 
-    const newComment = { userId, content, userName,profilePicture };
+    const newComment = { userId, content, userName,profilePicture,postUserId };
 
     
     const findCommentById = (commentId, commentsArray) => {
@@ -629,6 +630,18 @@ postRoutes.post("/:_id/comments", async (req, res) => {
       }
       parentComment.comments.push(newComment);
     }
+
+    const newNotification = new Notification({
+      userId, // Who commented
+      requestedUserName: userName,
+      commented: true,
+      postId: _id,
+      postUserId, // Owner of the post who should be notified
+      status: false 
+    });
+
+    // Save the notification
+    await newNotification.save();
 
     
     const updatedPost = await post.save();
