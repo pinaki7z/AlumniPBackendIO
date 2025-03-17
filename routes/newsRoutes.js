@@ -49,25 +49,25 @@ newsRoutes.post("/create", upload.single("videoPath"), async (req, res) => {
     }
 
     const currentDate = new Date();
-    const options = {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "numeric",
-      minute: "numeric",
-      second: "numeric",
-      timeZone: "Asia/Kolkata",
-    };
+    // const options = {
+    //   weekday: "long",
+    //   year: "numeric",
+    //   month: "long",
+    //   day: "numeric",
+    //   hour: "numeric",
+    //   minute: "numeric",
+    //   second: "numeric",
+    //   timeZone: "Asia/Kolkata",
+    // };
 
-    const creationDate = currentDate.toLocaleString("en-IN", options);
+    // const creationDate = currentDate.toLocaleString("en-IN", options);
 
     const newNews = new News({
       picturePath,
       description,
       videoPath,
       department,
-      createdAt: creationDate,
+      createdAt: currentDate,
       type: "news"
     });
     await newNews.save();
