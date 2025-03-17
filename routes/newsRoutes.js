@@ -36,7 +36,7 @@ const upload = multer({ storage });
 
 newsRoutes.post("/create", upload.single("videoPath"), async (req, res) => {
   try {
-    const { title,description,picturePath,department } = req.body;
+    const { title,author,description,picturePath,department } = req.body;
     const folderName= req.query.folder;
     console.log("foldername:", folderName);
     let videoPath = null;
@@ -68,7 +68,8 @@ newsRoutes.post("/create", upload.single("videoPath"), async (req, res) => {
       videoPath,
       department,
       createdAt: currentDate,
-      type: "news"
+      type: "news",
+      author
     });
     await newNews.save();
 

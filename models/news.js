@@ -7,7 +7,8 @@ const newsSchema = new mongoose.Schema({
   picturePath: [String],
   videoPath: Object,
   department: String,
-  type: String
+  type: String,
+  author: String
 },
 { timestamps: true });
 
