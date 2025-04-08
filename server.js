@@ -165,7 +165,7 @@ const secretKey =
     }
   
     socket.on("message", async (messageData) => {
-      const { recipient, text, file } = messageData;
+      const { recipient, text, file,sender } = messageData;
       let filename = null;
   
       if (file) {
@@ -185,7 +185,7 @@ const secretKey =
       if (recipient && (text || file)) {
         console.log('recipient',recipient,text)
         const messageDoc = await Message.create({
-          sender: socket.userId,
+          sender,
           recipient,
           text,
           file: file ? filename : null,
