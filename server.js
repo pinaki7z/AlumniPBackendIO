@@ -124,100 +124,107 @@ app.use("/images", imageRoutes);
 const secretKey =
   "f3c8a3c9b8a9f0b2440a646f3a5b8f9e6d6e46555a4b2b5c6d7c8d9e0a1b2c3d4f5e6a7b8c9d0e1f2a3b4c5d6e7f8g9h0";
 
-  const onlineUserIds = new Set();
+const onlineUserIds = new Set();
+let onlinePeople = 0;
 
-  io.on("connection", (socket) => {
-    console.log("User connected:", socket.id);
-  
-    const cookies = socket.handshake.headers.cookie;
-    if (cookies) {
-      const tokenCookieString = cookies
-        .split(";")
-        .find((str) => str.trim().startsWith("token="));
-      
-      if (tokenCookieString) {
-        const token = tokenCookieString.split("=")[1];
-        try {
-          const userData = jwt.verify(token, secretKey);
-          const { userId, username } = userData;
-  
-          socket.userId = userId;
-          socket.username = username;
-  
-          onlineUserIds.add(userId);
-          notifyAboutOnlinePeople();
-        } catch (err) {
-          console.error("Invalid token:", err.message);
-        }
+io.on("connection", (socket) => {
+  console.log("User connected:", socket.id);
+  onlinePeople++;
+  io.emit("onlineUsers", onlinePeople);
+
+  const cookies = socket.handshake.headers.cookie;
+  if (cookies) {
+    const tokenCookieString = cookies
+      .split(";")
+      .find((str) => str.trim().startsWith("token="));
+
+    if (tokenCookieString) {
+      const token = tokenCookieString.split("=")[1];
+      try {
+        const userData = jwt.verify(token, secretKey);
+        const { userId, username } = userData;
+
+        socket.userId = userId;
+        socket.username = username;
+
+        onlineUserIds.add(userId);
+        notifyAboutOnlinePeople();
+      } catch (err) {
+        console.error("Invalid token:", err.message);
       }
     }
-  
-    function notifyAboutOnlinePeople() {
-      const onlineUsers = [];
-  
+  }
+
+  function notifyAboutOnlinePeople() {
+    const onlineUsers = [];
+
+    for (const [id, s] of io.sockets.sockets) {
+      if (s.userId && s.username) {
+        onlineUsers.push({ userId: s.userId, username: s.username });
+      }
+    }
+    console.log("online users", onlineUsers);
+
+    io.emit("online-users", onlineUsers); // send to all clients
+  }
+
+  socket.on("message", async (messageData) => {
+    console.log("message data",messageData)
+    const { recipient, text, file, sender } = messageData;
+    console.log("message data",messageData)
+    let filename = null;
+
+    if (file) {
+      filename = file.name;
+      const filePath = path.join(__dirname, "uploads", filename);
+      const bufferData = Buffer.from(file.data, "base64");
+
+      fs.writeFile(filePath, bufferData, (err) => {
+        if (err) {
+          console.error("Error saving file:", err);
+        } else {
+          console.log("File saved:", filePath);
+        }
+      });
+    }
+
+    if (recipient && (text || file)) {
+      console.log("recipient", recipient, text);
+      const messageDoc = await Message.create({
+        sender,
+        recipient,
+        text,
+        file: file ? filename : null,
+      });
+
+      console.log("message doc", messageDoc);
+
+      // Send message to the recipient if online
       for (const [id, s] of io.sockets.sockets) {
-        if (s.userId && s.username) {
-          onlineUsers.push({ userId: s.userId, username: s.username });
+        if (s.userId === recipient) {
+          s.emit("message", {
+            text,
+            sender: socket.userId,
+            recipient,
+            file: file ? filename : null,
+            _id: messageDoc._id,
+            createdAt: messageDoc.createdAt,
+          });
         }
       }
-  
-      io.emit("online-users", onlineUsers); // send to all clients
     }
-  
-    socket.on("message", async (messageData) => {
-      const { recipient, text, file,sender } = messageData;
-      let filename = null;
-  
-      if (file) {
-        filename = file.name;
-        const filePath = path.join(__dirname, "uploads", filename);
-        const bufferData = Buffer.from(file.data, "base64");
-  
-        fs.writeFile(filePath, bufferData, (err) => {
-          if (err) {
-            console.error("Error saving file:", err);
-          } else {
-            console.log("File saved:", filePath);
-          }
-        });
-      }
-      
-      if (recipient && (text || file)) {
-        console.log('recipient',recipient,text)
-        const messageDoc = await Message.create({
-          sender,
-          recipient,
-          text,
-          file: file ? filename : null,
-        });
-
-        console.log('message doc',messageDoc)
-  
-        // Send message to the recipient if online
-        for (const [id, s] of io.sockets.sockets) {
-          if (s.userId === recipient) {
-            s.emit("message", {
-              text,
-              sender: socket.userId,
-              recipient,
-              file: file ? filename : null,
-              _id: messageDoc._id,
-              createdAt: messageDoc.createdAt,
-            });
-          }
-        }
-      }
-    });
-  
-    socket.on("disconnect", () => {
-      console.log("User disconnected:", socket.id);
-      if (socket.userId) {
-        onlineUserIds.delete(socket.userId);
-      }
-      notifyAboutOnlinePeople();
-    });
   });
-  
+
+  socket.on("disconnect", () => {
+    console.log("User disconnected:", socket.id);
+    onlinePeople--;
+    io.emit("onlineUsers", onlinePeople);
+    if (socket.userId) {
+      onlineUserIds.delete(socket.userId);
+    }
+    notifyAboutOnlinePeople();
+  });
+});
 
 server.listen(apiPort, () => {
   console.log(`Server running on port ${apiPort}`);

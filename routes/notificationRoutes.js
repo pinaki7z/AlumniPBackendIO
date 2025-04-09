@@ -4,25 +4,25 @@ const Notification = require("../models/notification");
 const notificationRoutes = express.Router();
 
 notificationRoutes.get("/", async (req, res) => {
-    try {        
-        const notifications = await Notification.find({ follow: true });
+    try {
+        // Step 1: Get all notifications sorted by latest first
+        const notifications = await Notification.find({ follow: true }).sort({ updatedAt: -1 });
 
-        
         const uniqueNotificationsMap = new Map();
 
-       
+        // Step 2: Deduplicate
         for (const notification of notifications) {
             const key = `${notification.requestedUserName}-${notification.followedUserName}`;
-            if (uniqueNotificationsMap.has(key)) {
-                
-                await Notification.findByIdAndDelete(notification._id);
-            } else {
-                
+            if (!uniqueNotificationsMap.has(key)) {
                 uniqueNotificationsMap.set(key, notification);
+            } else {
+                // Optional: delete duplicates from DB
+                await Notification.findByIdAndDelete(notification._id);
             }
         }
-        
-        const uniqueNotifications = Array.from(uniqueNotificationsMap.values());
+
+        // Step 3: Convert map to array and limit to latest 5
+        const uniqueNotifications = Array.from(uniqueNotificationsMap.values()).slice(0, 5);
 
         return res.json(uniqueNotifications);
     } catch (error) {
@@ -30,6 +30,7 @@ notificationRoutes.get("/", async (req, res) => {
         return res.status(500).send(error);
     }
 });
+
 
 notificationRoutes.delete("/", async(req,res)=>{
     try {

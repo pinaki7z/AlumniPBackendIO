@@ -163,12 +163,13 @@ const upload = multer({
 
 postRoutes.post("/create", upload.single("videoPath"), async (req, res) => {
   try {
-    const { userId, description,picturePath,groupID,profilePicture } = req.body;
+    const { userId, description,picturePath,groupID,profilePicture,videoPath } = req.body;
     const folderName= req.query.folder;
     const alumni = await Alumni.findById(userId);
-    let videoPath = null;
+    //let videoPath = null;
  
     if (req.file) {
+      console.log('request file present')
       videoPath = {
         // videoPath: `http://localhost:3000/uploads/${folderName}/${req.file.originalname}`,
         videoPath: `uploads/${req.file.filename}`,
