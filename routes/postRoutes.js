@@ -137,29 +137,6 @@ const upload = multer({
 
 
 
-// const storage = multer.diskStorage({
-//   destination: async (req, file, cb) => {
-//     const folderName = req.query.folder || "default";
-//     const uploadPath = path.join(
-//       `D:/test/AlumniFrontend/AlumniFrontendD/public/uploads`,
-//       folderName
-//     );
-//     console.log("uploadpath:", uploadPath);
-
-//     try {
-//       await fs.promises.mkdir(uploadPath, { recursive: true });
-//       cb(null, uploadPath);
-//     } catch (err) {
-//       cb(err, null);
-//     }
-//   },
-//   filename: (req, file, cb) => {
-//     // const uniqueFilename = Date.now() + "-" + file.originalname;
-//     cb(null, file.originalname);
-//   },
-// });
-
-//const upload = multer({ storage });
 
 postRoutes.post("/create", upload.single("videoPath"), async (req, res) => {
   try {
@@ -201,37 +178,6 @@ postRoutes.post("/create", upload.single("videoPath"), async (req, res) => {
   }
 });
 
-// postRoutes.post("/create", async (req, res) => {
-//   try {
-//     const { userId, description,picturePath,groupID,profilePicture,videoPath } = req.body;
-//     console.log('userId:', userId, 'Type:', typeof userId);
-
-//     const folderName= req.query.folder;
-//     const alumni = await Alumni.findById(userId);
-
-//     const newPost = new Post({
-//       userId,
-//       firstName: alumni.firstName,
-//       lastName: alumni.lastName,
-//       location: alumni.location,
-//       picturePath,
-//       profilePicture,
-//       description,
-//       videoPath,
-//       groupID,
-//       likes: [],
-//       comments: [],
-//       archive: false,
-//       type: 'Post'
-//     });
-//     await newPost.save();
-
-//     // const post = await Post.find();
-//     res.status(201).json(newPost);
-//   } catch (err) {
-//     res.status(409).json({ message: err.message });
-//   }
-// });
 
 postRoutes.get("/:_id", async (req, res) => {
   try {

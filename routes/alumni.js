@@ -288,7 +288,7 @@ alumniRoutes.post(
         ? 3
         : specialRole
         ? 4
-        : null;
+        : 3;
 
       const newAlumni = new Alumni({
         firstName,
