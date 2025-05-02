@@ -529,7 +529,7 @@ groupRoutes.post("/createRequest", upload.single('businessVerification'),async (
 
 groupRoutes.get("/requests/req", async (req, res) => {
   try {
-    const requests = await Notification.find();
+    const requests = await Notification.find().sort({ createdAt: -1 });
     res.status(201).json(requests);
   } catch (error) {
     return res.send(error);

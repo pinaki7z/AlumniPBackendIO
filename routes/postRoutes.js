@@ -44,7 +44,7 @@ const mergeSortAndPaginate = async (page, size) => {
         const recId = new mongoose.Types.ObjectId(record.userId);
         const alumni = await Alumni.findOne({ _id: recId }, 'firstName lastName profilePicture');
         if (alumni) {
-          console.log('alumni',alumni._id)
+          // console.log('alumni',alumni._id)
           userName = `${alumni.firstName} ${alumni.lastName}`;
           profilePicture = alumni.profilePicture;
         }

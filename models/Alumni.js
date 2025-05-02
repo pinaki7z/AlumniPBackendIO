@@ -121,7 +121,10 @@ let AlumniSchema = new Schema(
     country: String,
     department: String,
     batch: String,
-    validated: Boolean,
+    validated: {
+      type: Boolean,
+      default: false
+    },
     workExperience: [Object],
     blockedByUserIds: [String],
     blockedContactsId: [String],

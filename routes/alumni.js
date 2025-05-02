@@ -456,16 +456,22 @@ alumniRoutes.post("/login", async (req, res) => {
     if (!alumni) {
       return res.status(404).json("Alumni not found");
     }
-
-    if (alumni.accountDeleted === true && alumni.validated !== false) {
+if (alumni.accountDeleted === true) {
       return res
         .status(404)
         .json("Account has been Deleted. Contact Admin to recover");
-    } else if (alumni.validated === false) {
-      return res
-        .status(404)
-        .json("Your ID validation was rejected. Contact Admin to recover");
-    }
+    } 
+
+    // if (alumni.accountDeleted === true && alumni.validated !== false) {
+    //   return res
+    //     .status(404)
+    //     .json("Account has been Deleted. Contact Admin to recover");
+    // } 
+    // else if (alumni.validated === false) {
+    //   return res
+    //     .status(404)
+    //     .json("Your ID validation was rejected. Contact Admin to recover");
+    // }
 
     let passwordMatch = false;
 
@@ -509,7 +515,7 @@ alumniRoutes.get("/all", async (req, res) => {
   try {
     const alumni = await Alumni.find()
       .select(
-        "firstName lastName profilePicture profileLevel _id email workExperience "
+        "firstName lastName profilePicture profileLevel _id email workExperience accountDeleted"
       )
       .lean();
     if (!alumni.length) {
@@ -549,6 +555,7 @@ alumniRoutes.put("/:alumniId", verifyToken, async (req, res) => {
     ID,
     student,
     workingAt,
+    idUpdated,
   } = updatedData;
 
   try {
@@ -599,8 +606,9 @@ alumniRoutes.put("/:alumniId", verifyToken, async (req, res) => {
         console.error("Error adding new company:", error);
       }
     }
+    console.log("idUpdated", idUpdated)
 
-    if (ID) {
+    if (ID && idUpdated ) {
       const admin = await Alumni.findOne({
         profileLevel: 1,
         department: alumni.department,
@@ -731,7 +739,7 @@ alumniRoutes.delete("/:alumniId", verifyToken, async (req, res) => {
 
       const updatedAlumni = await Alumni.findOneAndUpdate(
         { _id: req.params.alumniId },
-        { $set: { accountDeleted: false } },
+        { $set: { accountDeleted: false, validated: false, ID: "" } },
         { new: true }
       );
 
@@ -1257,7 +1265,7 @@ alumniRoutes.post(
               validated: true,
             });
           }
-          console.log("alumniData", alumniData);
+          // console.log("alumniData", alumniData);
           if (alumniData.length > 0) {
             await Alumni.insertMany(alumniData);
 
