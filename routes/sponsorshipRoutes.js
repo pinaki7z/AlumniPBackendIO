@@ -8,12 +8,12 @@ const Sponsorship = require("../models/sponsorship");
 const sponsorshipRoutes = express.Router();
 
 sponsorshipRoutes.post("/create", async (req, res) => {
-  const { userId,nameOfOrganiser,emailOfOrganiser, nameOfEvent, sponsorshipAmount, targetAudience,sponsorshipBenefits,useOfFunds,additionalInfo,eventDate,eventDescription,expectedAttendees,location,number,picturePath} = req.body;
+  const { userId,nameOfOrganiser,emailOfOrganiser,backgroundImage, nameOfEvent, sponsorshipAmount, targetAudience,sponsorshipBenefits,useOfFunds,additionalInfo,eventDate,eventDescription,expectedAttendees,location,number,picturePath} = req.body;
   console.log('request body',req.body)
   try {
     const currentDate = new Date();
     const newSponsorship = new Sponsorship({
-     userId,nameOfOrganiser,emailOfOrganiser, nameOfEvent, sponsorshipAmount, targetAudience,sponsorshipBenefits,useOfFunds,additionalInfo,eventDate,eventDescription,expectedAttendees,location,number,createdAt: currentDate
+     userId,nameOfOrganiser,emailOfOrganiser, nameOfEvent, backgroundImage,sponsorshipAmount, targetAudience,sponsorshipBenefits,useOfFunds,additionalInfo,eventDate,eventDescription,expectedAttendees,location,number,createdAt: currentDate
     });
     await newSponsorship.save();
     return res.status(201).send("successfully sponsorship details stored");
@@ -105,7 +105,7 @@ sponsorshipRoutes.get("/user/:_id", async (req, res) => {
   const userId = req.params._id; 
 
   try {
-      const sponsorships = await Sponsorship.find({ userId });
+      const sponsorships = await Sponsorship.find({ userId }).sort({ createdAt: -1 });
 
       
       if (sponsorships.length > 0) {

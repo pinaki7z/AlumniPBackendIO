@@ -739,7 +739,14 @@ alumniRoutes.delete("/:alumniId", verifyToken, async (req, res) => {
 
       const updatedAlumni = await Alumni.findOneAndUpdate(
         { _id: req.params.alumniId },
-        { $set: { accountDeleted: false, validated: false, ID: "" } },
+        {
+          $set: {
+            accountDeleted: false,
+            validated: false,
+            ID: "",
+            expirationDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          },
+        },
         { new: true }
       );
 
@@ -1149,10 +1156,10 @@ alumniRoutes.get("/:_id/blockedUsers", async (req, res) => {
 
 alumniRoutes.put("/alumni/validateId", async (req, res) => {
   const { userId, notificationId, toDelete } = req.body;
-  console.log("userId notification id", userId, notificationId);
+  // console.log("userId notification id", userId, notificationId);
 
   try {
-    const existingNotification = await Notification.findById(notificationId);
+    // const existingNotification = await Notification.findById(notificationId);
     if (toDelete === true) {
       // Update alumni's accountDeleted and expirationDate
       await Alumni.findByIdAndUpdate(userId, {
@@ -1353,5 +1360,150 @@ alumniRoutes.put("/delete/coverPicture", async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
+
+
+// get all alumni for validate page 
+alumniRoutes.get("/validate/user", async (req, res) => {
+  try {
+    const currentDate = new Date();
+
+    const records = await Alumni.aggregate([
+      // 1) sort by creation date
+      { $sort: { createdAt: -1 } },
+
+      // 2) project only the fields you need, and compute `status` + `type`  
+      { $project: {
+          firstName:       1,
+          lastName:        1,
+          profilePicture:  1,
+          email:           1,
+          // compute status
+          status: {
+            $switch: {
+              branches: [
+                { 
+                  case: { $eq: ["$accountDeleted", true] },
+                  then: "account-deleted"
+                },
+                {
+                  case: {
+                    $and: [
+                      { $ne: ["$expirationDate", null] },
+                      { $lt: ["$expirationDate", currentDate] }
+                    ]
+                  },
+                  then: "expired"
+                },
+                {
+                  case: { $eq: ["$validated", true] },
+                  then: "validated"
+                }
+              ],
+              default: "not-validated"
+            }
+          },
+
+          // compute type
+          type: {
+            $switch: {
+              branches: [
+                { case: { $eq: ["$profileLevel", 0] }, then: "super admin" },
+                { case: { $eq: ["$profileLevel", 1] }, then: "admin"       },
+                { case: { $eq: ["$profileLevel", 2] }, then: "alumni"      },
+                { case: { $eq: ["$profileLevel", 3] }, then: "student"     }
+              ],
+              default: "student"
+            }
+          }
+      }}
+    ]).exec();
+
+    res.send({ records, count: records.length });
+  } catch (error) {
+    console.error("error", error);
+    res.status(400).send({ success: false, msg: error.message });
+  }
+});
+
+// validity toggle alumni by id
+alumniRoutes.put("/alumni/:id/validateAlumni", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const alumni = await Alumni.findById(id, { _id: 1, validated: 1 });
+    // const notificationId = alumni.notificationId;
+    const userId = alumni._id;
+    const validated = alumni.validated;
+    if (validated === true) {
+      // Update alumni's accountDeleted and expirationDate
+      await Alumni.findByIdAndUpdate(userId, {
+        $set: {  validated: false, ID:"", expirationDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
+      });
+      
+      return res.status(200).send("Change Validatity stautus successfully.");
+    } else {
+      await Alumni.findOneAndUpdate(
+        { _id: userId },
+        {
+          $set: {
+            expirationDate: null,
+            accountDeleted: false,
+            validated: true,
+          },
+        }
+      );
+      //await Notification.findByIdAndUpdate(notificationId, { $set: { status: null } });
+
+
+      return res.status(200).send("Alumni ID validated successfully.");
+    }
+  } catch (error) {
+    console.error("Error occurred:", error);
+    return res.status(500).send("Internal Server Error");
+  }
+});
+
+// user delete accoun toggle
+alumniRoutes.put("/alumni/:id/deleteAccount", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const alumni = await Alumni.findById(id, { _id: 1, accountDeleted: 1 });
+    // const notificationId = alumni.notificationId;
+    const userId = alumni._id;
+    const accountDeleted = alumni.accountDeleted;
+    if (accountDeleted === true) {
+      // Update alumni's accountDeleted and expirationDate
+      await Alumni.findByIdAndUpdate(userId, {
+        $set: {
+          validated: false,
+          accountDeleted: false,
+          expirationDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days from now
+        },
+      });
+      
+      return res.status(200).send("Change Validatity stautus successfully.");
+    } else {
+      await Alumni.findOneAndUpdate(
+        { _id: userId },
+        {
+          $set: {
+            expirationDate: null,
+            accountDeleted: true,
+            validated: false,
+          },
+        }
+      );
+      //await Notification.findByIdAndUpdate(notificationId, { $set: { status: null } });
+
+
+      return res.status(200).send("Change Validatity stautus successfully.");
+    }
+  } catch (error) {
+    console.error("Error occurred:", error);
+    return res.status(500).send("Internal Server Error");
+  }
+});
+
 
 module.exports = alumniRoutes;

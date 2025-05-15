@@ -14,9 +14,10 @@ const validColors = [
 
 const eventSchema = new mongoose.Schema({
   userId: {
-    type: String,
-    required: true,
-  },
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Alumni',
+        required: true,
+      },
   userName: String,
   profilePicture: String,
   start: String,

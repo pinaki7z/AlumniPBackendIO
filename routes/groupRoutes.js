@@ -52,17 +52,17 @@ const mergeSortAndPaginate = async (page, size, groupID) => {
 
   // Fetch the actual paginated records from each collection
   const [posts, polls, events] = await Promise.all([
-    Post.find({ groupID })
+    Post.find({ groupID }).populate("userId", "firstName lastName profilePicture")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(size),
 
-    Poll.find({ groupID })
+    Poll.find({ groupID }).populate("userId", "firstName lastName profilePicture")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(size),
 
-    Event.find({ groupId: groupID })
+    Event.find({ groupId: groupID }).populate("userId", "firstName lastName profilePicture")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(size),
@@ -303,6 +303,7 @@ groupRoutes.put("/:_id", async (req, res) => {
     userId,
     groupLogo,
     groupPicture,
+    groupBackground,
     members,
     createdAt,
     category,
@@ -320,6 +321,7 @@ groupRoutes.put("/:_id", async (req, res) => {
     if (category) groupToUpdate.category = category;
     if (groupType) groupToUpdate.groupType = groupType;
     if (groupPicture) groupToUpdate.groupPicture = groupPicture;
+    if (groupBackground) groupToUpdate.groupBackground = groupBackground;
     if (isUserAdded) groupToUpdate.isUserAdded = isUserAdded;
 
     const updatedGroup = await Group.findByIdAndUpdate(groupId, groupToUpdate, {

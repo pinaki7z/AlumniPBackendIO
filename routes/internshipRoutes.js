@@ -56,7 +56,9 @@ internshipRoutes.post("/create", upload.array('attachments', 5), async (req, res
       salaryMax,
       location,
       coverImage,
-      type
+      type,
+      qualification,
+      responsibility,
     } = req.body;
 
     const attachmentNames = req.files.map(file => file.filename);
@@ -79,7 +81,9 @@ internshipRoutes.post("/create", upload.array('attachments', 5), async (req, res
       coverImage,
       archive: false,
       starred: [],
-      approved: false
+      approved: false,
+      qualification,
+      responsibility,
     });
     const savedInternship = await newInternship.save();
 

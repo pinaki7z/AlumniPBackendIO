@@ -2,8 +2,9 @@ const mongoose = require('mongoose');
 
 const jobsSchema = new mongoose.Schema({
   userId: {
-    type: String,
-    required: true,
+    type: mongoose.Schema.Types.ObjectId,
+        ref: 'Alumni',
+        required: true,
   },
   userName: String,
   profilePicture: String,
@@ -19,6 +20,8 @@ const jobsSchema = new mongoose.Schema({
   duration: String,
   employmentType: String,
   category: String,
+  qualification: String,
+  responsibility: String,
   verified: Boolean,
   questions: [],
   answers: {

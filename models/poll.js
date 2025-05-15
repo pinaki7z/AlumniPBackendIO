@@ -1,7 +1,11 @@
 const mongoose = require("mongoose");
 
 const pollSchema = new mongoose.Schema({
-  userId: String,
+ userId: {
+       type: mongoose.Schema.Types.ObjectId,
+       ref: 'Alumni',
+       required: true,
+     },
   userName: String,
   profilePicture: String,
   type: String,

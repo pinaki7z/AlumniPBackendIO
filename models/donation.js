@@ -20,6 +20,7 @@ const donationSchema = new mongoose.Schema({
     phone: Number,
     targetMarket: String,
     teamExperience: String,
+    backgroundImage: String,
     createdAt: Date
 })
 

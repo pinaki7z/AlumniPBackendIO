@@ -25,16 +25,17 @@ commentSchema.add({ comments: [commentSchema] });
 const postSchema = mongoose.Schema(
   {
     userId: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Alumni',
       required: true,
     },
     firstName: {
       type: String,
-      required: true,
+      // required: true,
     },
     lastName: {
       type: String,
-      required: true,
+      // required: true,
     },
     location: String,
     userName: String,
@@ -49,15 +50,18 @@ const postSchema = mongoose.Schema(
       sent: Boolean
     }],
     description: String,
+    youtubeVideoId: String,
     picturePath: [String],
     profilePicture: String,
     postUserId: {
-      type: String
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Alumni',
     },
     likes: [
       {
         userId: {
-          type: String,
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Alumni',
         },
         userName: {
           type: String,
@@ -67,7 +71,8 @@ const postSchema = mongoose.Schema(
     smile: [
       {
         userId: {
-          type: String,
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Alumni',
         },
         userName: {
           type: String,
@@ -77,7 +82,8 @@ const postSchema = mongoose.Schema(
     clap: [
       {
         userId: {
-          type: String,
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Alumni',
         },
         userName: {
           type: String,
@@ -87,18 +93,18 @@ const postSchema = mongoose.Schema(
     thumbsUp: [
       {
         userId: {
-          type: String,
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Alumni',
         },
         userName: {
           type: String,
         },
       },
-    ],    
+    ],
     comments: [commentSchema],
     videoPath: Object,
     type: String
   },
-  
   { timestamps: true }
 );
 

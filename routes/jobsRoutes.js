@@ -62,10 +62,11 @@ jobRoutes.post("/create", async (req, res) => {
       locationType,
       profilePicture,
       verified,
+      qualification,
+      responsibility,
       applyBy
     } = req.body;
 
-    console.log("Request body:", req.body);
 
     let savedItem;
 
@@ -95,6 +96,8 @@ jobRoutes.post("/create", async (req, res) => {
         userName,
         profilePicture,
         verified,
+        qualification,
+      responsibility,
       });
 
       savedItem = await newJob.save();

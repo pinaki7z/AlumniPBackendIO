@@ -22,12 +22,16 @@ const mergeSortAndPaginate = async (page, size) => {
   // Run all database queries in parallel without pagination (skip/limit)
   const [posts, jobs, polls, events] = await Promise.all([
     Post.find({ groupID: { $exists: false }, $or: [{ archive: false }, { archive: { $exists: false } }] })
+      .populate("userId", "firstName lastName profilePicture")
       .sort({ createdAt: -1 }),
     Job.find({ groupID: { $exists: false }, $or: [{ archive: false }, { archive: { $exists: false } }] })
+    .populate("userId", "firstName lastName profilePicture")
       .sort({ createdAt: -1 }),
     Poll.find({ groupID: { $exists: false }, $or: [{ archive: false }, { archive: { $exists: false } }] })
+    .populate("userId", "firstName lastName profilePicture")
       .sort({ createdAt: -1 }),
     Event.find({ $or: [{ archive: false }, { archive: { $exists: false } }] })
+    .populate("userId", "firstName lastName profilePicture")
       .sort({ createdAt: -1 }),
   ]);
 
@@ -35,29 +39,29 @@ const mergeSortAndPaginate = async (page, size) => {
   let combinedRecords = [...posts, ...jobs, ...polls, ...events];
 
   // Fetch the latest userName and profilePicture from the Alumni collection for each record
-  combinedRecords = await Promise.all(
-    combinedRecords.map(async (record) => {
-      let userName = '';
-      let profilePicture = '';
+  // combinedRecords = await Promise.all(
+  //   combinedRecords.map(async (record) => {
+  //     let userName = '';
+  //     let profilePicture = '';
       
-      if (record.userId) {
-        const recId = new mongoose.Types.ObjectId(record.userId);
-        const alumni = await Alumni.findOne({ _id: recId }, 'firstName lastName profilePicture');
-        if (alumni) {
-          // console.log('alumni',alumni._id)
-          userName = `${alumni.firstName} ${alumni.lastName}`;
-          profilePicture = alumni.profilePicture;
-        }
-      }
+  //     if (record.userId) {
+  //       const recId = new mongoose.Types.ObjectId(record.userId);
+  //       const alumni = await Alumni.findOne({ _id: recId }, 'firstName lastName profilePicture');
+  //       if (alumni) {
+  //         // console.log('alumni',alumni._id)
+  //         userName = `${alumni.firstName} ${alumni.lastName}`;
+  //         profilePicture = alumni.profilePicture;
+  //       }
+  //     }
 
-      // Return the record along with updated userName and profilePicture
-      return {
-        ...record._doc, // Spreads the post/job/event details
-        userName: userName || record.userName, // Updates userName if found, otherwise keeps the existing one
-        profilePicture: profilePicture || record.profilePicture, // Updates profilePicture if found
-      };
-    })
-  );
+  //     // Return the record along with updated userName and profilePicture
+  //     return {
+  //       ...record._doc, // Spreads the post/job/event details
+  //       userName: userName || record.userName, // Updates userName if found, otherwise keeps the existing one
+  //       profilePicture: profilePicture || record.profilePicture, // Updates profilePicture if found
+  //     };
+  //   })
+  // );
 
   // Sort combined records by createdAt date
   combinedRecords = combinedRecords.sort((a, b) => b.createdAt - a.createdAt);
@@ -96,9 +100,15 @@ const mergeSortAndPaginateArchive = async (page, size) => {
 
 const mergeSortAndPaginateUser = async (page,size,id) => {
   const skip = (page - 1) * size;
-  const allPosts = await Post.find({ userId: id }).sort({ createdAt: -1 });
-  const allJobs = await Job.find({ userId: id }).sort({ createdAt: -1 });
-  const allPolls = await Poll.find({ userId: id } ).sort({ createdAt: -1 });
+  const allPosts = await Post.find({ userId: id })
+  .populate("userId", "firstName lastName profilePicture")
+  .sort({ createdAt: -1 });
+  const allJobs = await Job.find({ userId: id })
+  .populate("userId", "firstName lastName profilePicture")
+  .sort({ createdAt: -1 });
+  const allPolls = await Poll.find({ userId: id } )
+  .populate("userId", "firstName lastName profilePicture")
+  .sort({ createdAt: -1 });
   const totalPosts = allPosts + allJobs + allPolls;
   const combinedRecords = [...allPosts, ...allJobs, ...allPolls]
     .sort((a, b) => b.createdAt - a.createdAt)
@@ -140,9 +150,9 @@ const upload = multer({
 
 postRoutes.post("/create", upload.single("videoPath"), async (req, res) => {
   try {
-    const { userId, description,picturePath,groupID,profilePicture,videoPath } = req.body;
+    const { userId, description,picturePath,groupID,profilePicture,videoPath, youtubeVideoId } = req.body;
     const folderName= req.query.folder;
-    const alumni = await Alumni.findById(userId);
+    // const alumni = await Alumni.findById(userId);
     //let videoPath = null;
  
     if (req.file) {
@@ -156,9 +166,9 @@ postRoutes.post("/create", upload.single("videoPath"), async (req, res) => {
 
     const newPost = new Post({
       userId,
-      firstName: alumni.firstName,
-      lastName: alumni.lastName,
-      location: alumni.location,
+      // firstName: alumni.firstName,
+      // lastName: alumni.lastName,
+      // location: alumni.location,
       picturePath,
       profilePicture,       
       description,
@@ -167,7 +177,8 @@ postRoutes.post("/create", upload.single("videoPath"), async (req, res) => {
       likes: [],
       comments: [],
       archive: false,
-      type: 'Post'
+      type: 'Post', 
+      youtubeVideoId
     });
     await newPost.save();
 
@@ -181,7 +192,7 @@ postRoutes.post("/create", upload.single("videoPath"), async (req, res) => {
 
 postRoutes.get("/:_id", async (req, res) => {
   try {
-    const post = await Post.findById(req.params._id);
+    const post = await Post.findById(req.params._id).populate("userId", "firstName lastName profilePicture");
 
     if (!post) {
       console.error("No such post");

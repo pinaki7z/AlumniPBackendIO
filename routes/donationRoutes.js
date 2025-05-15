@@ -33,20 +33,19 @@ const fileFilter = (req, file, cb) => {
 
 const upload = multer({ storage: storage, fileFilter: fileFilter });
 
-donationRoutes.post("/create",upload.single('businessPlan'),async (req, res) => {
-  const { userId,amount,businessDescription,businessName,competitiveAdvantage,currentRevenue,email,fundingGoal,industry,marketingStrategy,name,phone,targetMarket,teamExperience,picturePath } = req.body;
+donationRoutes.post("/create",async (req, res) => {
+  const { userId,amount,businessPlan,businessDescription,businessName,competitiveAdvantage,backgroundImage,currentRevenue,email,fundingGoal,industry,marketingStrategy,name,phone,targetMarket,teamExperience,picturePath } = req.body;
   try {
     const currentDate = new Date();
 
-    console.log('reqst file',req.file)
-    
+    // console.log('reqst file',req.file)
 
     const newDonation = new Donation({
       userId,
       createdAt: currentDate,
       amount,
       businessDescription,
-      businessPlan: req.file.filename,
+      businessPlan,
       competitiveAdvantage,
       currentRevenue,
       email,
@@ -57,7 +56,9 @@ donationRoutes.post("/create",upload.single('businessPlan'),async (req, res) => 
       phone,
       targetMarket,
       teamExperience,
-      picturePath
+      picturePath, 
+      businessName, 
+      backgroundImage
 
     });
     await newDonation.save();
@@ -119,7 +120,7 @@ donationRoutes.delete("/:_id", async (req, res) => {
   }
 });
 
-donationRoutes.put("/:_id", upload.single('businessPlan'), async (req, res) => {
+donationRoutes.put("/:_id", async (req, res) => {
   const updatedData = req.body;
 
   try {
@@ -128,12 +129,6 @@ donationRoutes.put("/:_id", upload.single('businessPlan'), async (req, res) => {
     if (!donation) {
       console.error("No such donation");
       return res.status(404).send("Donation not found");
-    }
-
-    // If a new businessPlan file is uploaded, update the filename
-    if (req.file) {
-      console.log('Uploaded file:', req.file);
-      updatedData.businessPlan = req.file.filename;
     }
 
     // Update the donation object with new data
@@ -154,7 +149,7 @@ donationRoutes.get("/user/:_id", async (req, res) => {
   const userId = req.params._id; 
 
   try {
-      const donations = await Donation.find({ userId });
+      const donations = await Donation.find({ userId }).sort({ createdAt: -1 });
 
       
       if (donations.length > 0) {
