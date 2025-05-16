@@ -70,7 +70,7 @@ jobRoutes.post("/create", async (req, res) => {
 
     let savedItem;
 
-    if (type === "Job") {
+    if (type) {
       console.log("Creating a job post");
       const newJob = new Job({
         userId,
@@ -103,37 +103,39 @@ jobRoutes.post("/create", async (req, res) => {
       savedItem = await newJob.save();
       console.log("Job saved:", savedItem);
 
-    } else if (type === "Internship") {
-      console.log("Creating an internship post");
-      const newInternship = new Internship({
-        userId,
-        title,
-        description,
-        questions,
-        category,
-        employmentType,
-        duration,
-        applyBy,
-        currency,
-        salaryMin,
-        salaryMax,
-        attachments,
-        location,
-        locationType,
-        type,
-        company,
-        coverImage,
-        archive: false,
-        starred: [],
-        approved: false,
-        userName,
-        profilePicture,
-        verified,
-      });
+    } 
+    // else if (type === "Internship") {
+    //   console.log("Creating an internship post");
+    //   const newInternship = new Internship({
+    //     userId,
+    //     title,
+    //     description,
+    //     questions,
+    //     category,
+    //     employmentType,
+    //     duration,
+    //     applyBy,
+    //     currency,
+    //     salaryMin,
+    //     salaryMax,
+    //     attachments,
+    //     location,
+    //     locationType,
+    //     type,
+    //     company,
+    //     coverImage,
+    //     archive: false,
+    //     starred: [],
+    //     approved: false,
+    //     userName,
+    //     profilePicture,
+    //     verified,
+    //   });
 
-      savedItem = await newInternship.save();
-      console.log("Internship saved:", savedItem);
-    } else {
+    //   savedItem = await newInternship.save();
+    //   console.log("Internship saved:", savedItem);
+    // }
+     else {
       console.error("Invalid type:", type);
       return res.status(400).json({ error: "Invalid type. Must be 'Job' or 'Internship'." });
     }
