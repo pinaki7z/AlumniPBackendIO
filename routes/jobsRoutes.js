@@ -469,4 +469,19 @@ jobRoutes.get("/:_id/appliedJobs", async (req, res) => {
   }
 });
 
+jobRoutes.put("/make/job/:id/verifyToggle", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const job = await Job.findById(id);
+    if (!job) {
+      return res.status(404).json({ message: "Job not found" });
+    }
+    job.approved = !job.approved;
+    await job.save();
+    return res.status(200).json({ message: job.approved ? "Job unverified successfully" : "Job verified successfully" });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 module.exports = jobRoutes;
