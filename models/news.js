@@ -2,6 +2,11 @@ const mongoose = require('mongoose');
 
 const newsSchema = new mongoose.Schema({
   title:String,
+  userId:{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Alumni',
+    required: true,
+  },
   description:String,
   createdAt: String,
   picturePath: [String],

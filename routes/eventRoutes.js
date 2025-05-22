@@ -272,6 +272,7 @@ eventRoutes.delete("/:_id", async (req, res) => {
     return res.status(500).send("Internal Server Error");
   }
 });
+
 eventRoutes.delete("/", async (req, res) => {
   try {
     await Event.deleteMany({});

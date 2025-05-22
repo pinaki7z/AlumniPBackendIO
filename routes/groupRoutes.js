@@ -94,6 +94,7 @@ groupRoutes.post("/create", async (req, res) => {
     member,
     groupLogo,
     groupType,
+    groupBackground,
     category,
     groupPicture,
   } = req.body;
@@ -135,6 +136,7 @@ groupRoutes.post("/create", async (req, res) => {
       createdAt: currentDate,
       members: [member],
       groupType,
+      groupBackground,
       category,
       businessConnect,
       groupPicture,
@@ -455,16 +457,16 @@ groupRoutes.post("/createRequest", upload.single('businessVerification'),async (
       }
 
       
-      const newNotification = new Notification({
-        userId,
-        ID,
-        ownerId: admin._id,
-        requestedUserName,
-        status: false,
-      });
-      await newNotification.save();
+      // const newNotification = new Notification({
+      //   userId,
+      //   ID,
+      //   ownerId: admin._id,
+      //   requestedUserName,
+      //   status: false,
+      // });
+      // await newNotification.save();
       requested = true;
-      return res.status(201).json({ newNotification, requested });
+      return res.status(201).json({  requested });
     }
     if(req.file){
       const alumni = await Alumni.findOne({ _id: userId });
@@ -483,17 +485,17 @@ groupRoutes.post("/createRequest", upload.single('businessVerification'),async (
       }
 
       
-      const newNotification = new Notification({
-        userId,
-        businessVerification: req.file.filename,
-        ownerId: admin._id,
-        groupId,
-        requestedUserName,
-        status: false,
-      });
-      await newNotification.save();
+      // const newNotification = new Notification({
+      //   userId,
+      //   businessVerification: req.file.filename,
+      //   ownerId: admin._id,
+      //   groupId,
+      //   requestedUserName,
+      //   status: false,
+      // });
+      // await newNotification.save();
       requested = true;
-      return res.status(201).json({ newNotification, requested });
+      return res.status(201).json({  requested });
     }
 
     // For regular notification creation
@@ -511,17 +513,17 @@ groupRoutes.post("/createRequest", upload.single('businessVerification'),async (
         requested,
       });
     } else {
-      const newNotification = new Notification({
-        userId,
-        groupId,
-        ownerId,
-        requestedUserName,
-        groupName,
-        status: false,
-      });
-      await newNotification.save();
+      // const newNotification = new Notification({
+      //   userId,
+      //   groupId,
+      //   ownerId,
+      //   requestedUserName,
+      //   groupName,
+      //   status: false,
+      // });
+      // await newNotification.save();
       requested = true;
-      return res.status(201).json({ newNotification, requested });
+      return res.status(201).json({  requested });
     }
   } catch (error) {
     return res.status(500).json({ error: "Internal server error" });

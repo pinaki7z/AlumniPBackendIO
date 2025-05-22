@@ -15,7 +15,7 @@ const groupSchema = new mongoose.Schema({
 ],
   createdAt: Date,
   category: String,
-  groupType: String,
+  groupType: { type: String, default: 'public' },
   isUserAdded: Boolean,
   department: String,
   groupPicture: String,

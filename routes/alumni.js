@@ -249,19 +249,20 @@ alumniRoutes.post(
       specialRole,
       appliedJobs,
       linkedIn,
+      userType,
       expirationDate,
     } = req.body;
     let { otp, status, profileLevel } = req.body;
 
     try {
-      const captchaVerifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${process.env.RECAPTCHA_SECRET}&response=${captchaToken}`;
+      // const captchaVerifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${process.env.RECAPTCHA_SECRET}&response=${captchaToken}`;
 
-      const captchaResponse = await axios.post(captchaVerifyUrl);
-      if (!captchaResponse.data.success) {
-        return res
-          .status(400)
-          .json("reCAPTCHA validation failed. Please try again.");
-      }
+      // const captchaResponse = await axios.post(captchaVerifyUrl);
+      // if (!captchaResponse.data.success) {
+      //   return res
+      //     .status(400)
+      //     .json("reCAPTCHA validation failed. Please try again.");
+      // }
       // Check if the username already exists in the database
       const existingAlumni = await Alumni.findOne({ email });
       if (existingAlumni) {
@@ -280,16 +281,23 @@ alumniRoutes.post(
         newExpirationDate.setDate(currentDate.getDate() + 7);
       }
 
-      const profileLevelValue = admin
-        ? 1
-        : alumni
-        ? 2
-        : student
-        ? 3
-        : specialRole
-        ? 4
-        : 3;
-
+      let profileLevelValue;
+      switch (userType.toLowerCase()) {
+        case "admin":
+          profileLevelValue = 1;
+          break;
+        case "alumni":
+          profileLevelValue = 2;
+          break;
+        case "student":
+          profileLevelValue = 3;
+          break;
+        case "specialRole":
+          profileLevelValue = 4;
+          break;
+        default:
+          profileLevelValue = 3;
+      }
       const newAlumni = new Alumni({
         firstName,
         lastName,
@@ -515,7 +523,7 @@ alumniRoutes.get("/all", async (req, res) => {
   try {
     const alumni = await Alumni.find()
       .select(
-        "firstName lastName profilePicture profileLevel _id email workExperience accountDeleted"
+        "firstName lastName profilePicture profileLevel _id email workExperience accountDeleted graduatingYear department batch"
       )
       .lean();
     if (!alumni.length) {
@@ -673,13 +681,13 @@ alumniRoutes.patch("/:_id/follow", async (req, res) => {
     } else {
       alumni.followers.push({ userId, firstName: userToUpdate.firstName });
       userToUpdate.following.push({ userId: _id, firstName: alumni.firstName });
-      const newNotification = new Notification({
-        userId: userId,
-        followedUser: _id,
-        follow: true,
-        followedUserName,
-        requestedUserName,
-      });
+      // const newNotification = new Notification({
+      //   userId: userId,
+      //   followedUser: _id,
+      //   follow: true,
+      //   followedUserName,
+      //   requestedUserName,
+      // });
 
       await alumni.save();
       await userToUpdate.save();
@@ -1371,12 +1379,16 @@ alumniRoutes.get("/validate/user", async (req, res) => {
       // 1) sort by creation date
       { $sort: { createdAt: -1 } },
 
-      // 2) project only the fields you need, and compute `status` + `type`  
+      // 2) filter out super admin
+      { $match: { profileLevel: { $ne: 0 } } },
+
+      // 3) project only the fields you need, and compute `status` + `type`  
       { $project: {
           firstName:       1,
           lastName:        1,
           profilePicture:  1,
           email:           1,
+          ID:              1,
           // compute status
           status: {
             $switch: {
@@ -1407,7 +1419,6 @@ alumniRoutes.get("/validate/user", async (req, res) => {
           type: {
             $switch: {
               branches: [
-                { case: { $eq: ["$profileLevel", 0] }, then: "super admin" },
                 { case: { $eq: ["$profileLevel", 1] }, then: "admin"       },
                 { case: { $eq: ["$profileLevel", 2] }, then: "alumni"      },
                 { case: { $eq: ["$profileLevel", 3] }, then: "student"     }

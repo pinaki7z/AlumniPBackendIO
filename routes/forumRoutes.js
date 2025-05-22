@@ -91,15 +91,15 @@ forumRoutes.post("/createRequest", async (req, res) => {
         requested,
       });
     } else {
-      const newNotification = new Notification({
-        userId,
-        forumId,
-        ownerId,
-        requestedUserName,
-        forumName,
-        status: false,
-      });
-      await newNotification.save();
+      // const newNotification = new Notification({
+      //   userId,
+      //   forumId,
+      //   ownerId,
+      //   requestedUserName,
+      //   forumName,
+      //   status: false,
+      // });
+      // await newNotification.save();
       requested = true;
       res.status(201).json({ newNotification, requested });
     }
@@ -404,19 +404,19 @@ forumRoutes.post("/:_id/reportToSuperAdmin", async (req, res) => {
   const forumId = _id;
   let requested;
   try {
-    const newNotification = new Notification({
-      userId,
-      forumId,
-      ownerId,
-      requestedUserName,
-      forumName,
-      commentId,
-      comment,
-      status: false,
-    });
+    // const newNotification = new Notification({
+    //   userId,
+    //   forumId,
+    //   ownerId,
+    //   requestedUserName,
+    //   forumName,
+    //   commentId,
+    //   comment,
+    //   status: false,
+    // });
 
     // Save the new notification
-    await newNotification.save();
+    // await newNotification.save();
 
     // Find the forum by _id
     const forum = await Forum.findById(_id);

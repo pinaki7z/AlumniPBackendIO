@@ -589,17 +589,17 @@ postRoutes.post("/:_id/comments", async (req, res) => {
       parentComment.comments.push(newComment);
     }
 
-    const newNotification = new Notification({
-      userId, // Who commented
-      requestedUserName: userName,
-      commented: true,
-      postId: _id,
-      postUserId, // Owner of the post who should be notified
-      status: false 
-    });
+    // const newNotification = new Notification({
+    //   userId, // Who commented
+    //   requestedUserName: userName,
+    //   commented: true,
+    //   postId: _id,
+    //   postUserId, // Owner of the post who should be notified
+    //   status: false 
+    // });
 
     // Save the notification
-    await newNotification.save();
+    // await newNotification.save();
 
     
     const updatedPost = await post.save();
