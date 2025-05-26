@@ -27,6 +27,7 @@ const forgotPassRoutes = require("./routes/forgotPass");
 const imageRoutes = require("./routes/imageRoutes");
 const photoGallaryRoutes = require("./routes/photoGallaryRoutes");
 const jobApplicationRoutes = require("./routes/jobApplicationRoutes");
+const groupMemberRoutes = require("./routes/groupMemberRoutes");
 
 
 const Message = require("./models/message");
@@ -125,6 +126,7 @@ app.use("/forgotPass", forgotPassRoutes);
 app.use("/images", imageRoutes);
 app.use("/photoGallary", photoGallaryRoutes);
 app.use("/jobApplication", jobApplicationRoutes);
+app.use("/groupMember", groupMemberRoutes);
 
 const secretKey =
   "f3c8a3c9b8a9f0b2440a646f3a5b8f9e6d6e46555a4b2b5c6d7c8d9e0a1b2c3d4f5e6a7b8c9d0e1f2a3b4c5d6e7f8g9h0";
