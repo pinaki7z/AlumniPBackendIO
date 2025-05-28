@@ -375,7 +375,7 @@ alumniRoutes.post(
       return res.status(201).send("Alumni registered successfully");
     } catch (error) {
       console.error("Error registering alumni:", error);
-      return res.status(500).send("Internal Server Error");
+      return res.status(500).send("Internal Server Error", error);
     }
   }
 );
