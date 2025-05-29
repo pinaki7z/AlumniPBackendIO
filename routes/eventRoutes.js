@@ -125,10 +125,10 @@ eventRoutes.post("/createEvent", async (req, res) => {
 
       await newGroup.save();
       await newEvent.save();
-      console.log("new event id", newEvent._id);
+      // console.log("new event id", newEvent._id);
     } else {
       await newEvent.save();
-      console.log("new event id", newEvent._id);
+      // console.log("new event id", newEvent._id);
     }
     // const transporter = nodemailer.createTransport({
     //   host: "smtp.gmail.com",
@@ -149,15 +149,15 @@ eventRoutes.post("/createEvent", async (req, res) => {
 
     // transporter.sendMail(message, (err, info) => {
     //   if (err) {
-    //     console.log("Error occurred. " + err.message);
+    //     // console.log("Error occurred. " + err.message);
     //   } else {
-    //     console.log("Message sent: %s", info.messageId);
-    //     console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
+    //     // console.log("Message sent: %s", info.messageId);
+    //     // console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
     //   }
     // });
 
     res.status(201).send(newEvent);
-    console.log("new event id", newEvent._id);
+    // console.log("new event id", newEvent._id);
   } catch (error) {
     console.error(error);
     return res.status(500).send(error);
@@ -232,10 +232,10 @@ eventRoutes.delete("/:_id", async (req, res) => {
 
       transporter.sendMail(message, (err, info) => {
         if (err) {
-          console.log("Error occurred. " + err.message);
+          // console.log("Error occurred. " + err.message);
         } else {
-          console.log("Message sent: %s", info.messageId);
-          console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
+          // console.log("Message sent: %s", info.messageId);
+          // console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
         }
       });
 
@@ -259,10 +259,10 @@ eventRoutes.delete("/:_id", async (req, res) => {
 
     transporter.sendMail(message, (err, info) => {
       if (err) {
-        console.log("Error occurred. " + err.message);
+        // console.log("Error occurred. " + err.message);
       } else {
-        console.log("Message sent: %s", info.messageId);
-        console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
+        // console.log("Message sent: %s", info.messageId);
+        // console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
       }
     });
 
@@ -287,7 +287,7 @@ eventRoutes.delete("/", async (req, res) => {
 eventRoutes.put("/attendEvent/:_id", async (req, res) => {
   const eventID = req.params._id;
   const { userId, userName, profilePicture, attendance, groupName,department,classNo,graduatingYear } = req.body;
-  console.log("attendance", classNo,graduatingYear,department);
+  // console.log("attendance", classNo,graduatingYear,department);
 
   try {
     const event = await Event.findById(eventID);
@@ -298,7 +298,7 @@ eventRoutes.put("/attendEvent/:_id", async (req, res) => {
     const userObject = { userId, userName, profilePicture,department,classNo,graduatingYear };
 
     const removeUserFromArray = (array) => {
-      console.log("array remover", array);
+      // // console.log("array remover", array);
       const index = array.findIndex((user) => user.userId === userId);
       if (index !== -1) {
         array.splice(index, 1);
