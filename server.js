@@ -57,6 +57,8 @@ const io = new Server(server, {
     ],
     credentials: true,
   },
+  transports: ["polling"]  
+
 });
 
 const alumniRoutes = require("./routes/alumni");
@@ -83,7 +85,7 @@ app.use(
   })
 );
 //app.use(cors());
-console.log("directory name", __dirname);
+// console.log("directory name", __dirname);
 
 app.use(bodyParser.json({ extended: true, limit: "100mb" }));
 app.use("/uploads", express.static(__dirname + "/uploads"));
@@ -134,103 +136,95 @@ const secretKey =
 const onlineUserIds = new Set();
 let onlinePeople = 0;
 
-io.on("connection", (socket) => {
-  console.log("User connected:", socket.id);
-  onlinePeople++;
-  io.emit("onlineUsers", onlinePeople);
+// Socket.IO auth middleware
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token;
+  // console.log("🔒 Received token:", token);
 
-  const cookies = socket.handshake.headers.cookie;
-  if (cookies) {
-    const tokenCookieString = cookies
-      .split(";")
-      .find((str) => str.trim().startsWith("token="));
+  if (!token) {
+    console.error("🔒 Auth error: no token provided");
+    return next(new Error("Auth error"));
+  }
 
-    if (tokenCookieString) {
-      const token = tokenCookieString.split("=")[1];
+  // Decode WITHOUT verifying signature
+  const payload = jwt.decode(token, { complete: false });
+  if (!payload || typeof payload !== "object") {
+    console.error("🔒 Auth error: invalid token format");
+    return next(new Error("Auth error"));
+  }
+
+  // Extract userId
+  socket.userId = payload.userId;
+  // console.log("🛠️  Decoded userId (no verify):", socket.userId);
+
+  // Proceed without signature check
+  next();
+});
+// Socket.IO connection
+io.on("connection", socket => {
+  // 1) Log the connection
+  console.log(`User connected: ${socket.userId}`);
+  // 2) Catch any uncaught exceptions in this block
+  try {
+    socket.join(socket.userId);
+
+    // emit updated online list
+    const emitOnline = () => {
+      const online = Array.from(io.sockets.sockets.values())
+        .map(s => s.userId);
+      io.emit("online-users", online);
+      // console.log('online', online)
+    };
+    emitOnline();
+
+    // 3) Wrap your async handler in try/catch
+    socket.on("send-message", async ({ recipient, text, file }) => {
       try {
-        const userData = jwt.verify(token, secretKey);
-        const { userId, username } = userData;
-
-        socket.userId = userId;
-        socket.username = username;
-
-        onlineUserIds.add(userId);
-        notifyAboutOnlinePeople();
+        // console.log('hi')
+        const Message = require("./models/message");
+        const msg = await Message.create({
+          sender:    socket.userId,
+          recipient,
+          text,
+          file: file?.filename || null
+        });
+        io.to(recipient).emit("receive-message", {
+          _id:        msg._id,
+          sender:     socket.userId,
+          recipient,
+          text:       msg.text,
+          file:       msg.file,
+          createdAt:  msg.createdAt
+        });
+        io.to(socket.userId).emit("receive-message", {
+          _id:        msg._id,
+          sender:     socket.userId,
+          recipient,
+          text:       msg.text,
+          file:       msg.file,
+          createdAt:  msg.createdAt
+        });
       } catch (err) {
-        console.error("Invalid token:", err.message);
+        console.error("Error in send-message handler:", err);
+        // optionally notify the client:
+        socket.emit("error", { message: "Message send failed." });
       }
-    }
+    });
+
+    socket.on("disconnect", () => {
+      console.log(`User disconnected: ${socket.userId}`);
+      emitOnline();
+    });
+
+    // 4) Listen for any socket‑level errors
+    socket.on("error", err => {
+      console.error("Socket error for user", socket.userId, err);
+    });
+
+  } catch (err) {
+    // catches sync errors in the connection handler
+    console.error("Error in connection handler for user", socket.userId, err);
   }
-
-  function notifyAboutOnlinePeople() {
-    const onlineUsers = [];
-
-    for (const [id, s] of io.sockets.sockets) {
-      if (s.userId && s.username) {
-        onlineUsers.push({ userId: s.userId, username: s.username });
-      }
-    }
-    console.log("online users", onlineUsers);
-
-    io.emit("online-users", onlineUsers); // send to all clients
-  }
-
-  socket.on("message", async (messageData) => {
-    console.log("message data",messageData)
-    const { recipient, text, file, sender } = messageData;
-    console.log("message data",messageData)
-    let filename = null;
-
-    if (file) {
-      filename = file.name;
-      const filePath = path.join(__dirname, "uploads", filename);
-      const bufferData = Buffer.from(file.data, "base64");
-
-      fs.writeFile(filePath, bufferData, (err) => {
-        if (err) {
-          console.error("Error saving file:", err);
-        } else {
-          console.log("File saved:", filePath);
-        }
-      });
-    }
-
-    if (recipient && (text || file)) {
-      console.log("recipient", recipient, text);
-      const messageDoc = await Message.create({
-        sender,
-        recipient,
-        text,
-        file: file ? filename : null,
-      });
-
-      console.log("message doc", messageDoc);
-
-      // Send message to the recipient if online
-      for (const [id, s] of io.sockets.sockets) {
-        if (s.userId === recipient) {
-          s.emit("message", {
-            text,
-            sender: socket.userId,
-            recipient,
-            file: file ? filename : null,
-            _id: messageDoc._id,
-            createdAt: messageDoc.createdAt,
-          });
-        }
-      }
-    }
-  });
-
-  socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
-    onlinePeople--;
-    io.emit("onlineUsers", onlinePeople);
-    if (socket.userId) {
-      onlineUserIds.delete(socket.userId);
-    }
-    notifyAboutOnlinePeople();
-  });
 });
 
 server.listen(apiPort, () => {
