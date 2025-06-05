@@ -478,7 +478,7 @@ jobRoutes.put("/make/job/:id/verifyToggle", async (req, res) => {
     }
     job.approved = !job.approved;
     await job.save();
-    return res.status(200).json({ message: job.approved ? "Job unverified successfully" : "Job verified successfully" });
+    return res.status(200).json({ message: job.approved ? "Job verified successfully" : "Job unverified successfully" });
   } catch (error) {
     return res.status(500).json({ message: "Internal server error" });
   }
