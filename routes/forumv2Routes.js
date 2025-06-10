@@ -22,99 +22,36 @@ router.post('/categories', async (req, res) => {
   }
 });
 
-// Get All Categories (enriched)
+// Get All Categories
 router.get('/categories', async (req, res) => {
   try {
     const cats = await withUser(Forumv2Category.find()).lean();
-    const enriched = await Promise.all(cats.map(async cat => {
-      const topics = await Forumv2Topic.find({ categoryId: cat._id })
-        .sort({ createdAt: -1 })
-        .select('_id title createdAt')
-        .lean();
-      const totalTopics = topics.length;
-      const lastTopic = topics[0] || null;
-      const topicIds = topics.map(t => t._id);
-      const totalPosts = topicIds.length
-        ? await Forumv2Post.countDocuments({ topicId: { $in: topicIds } })
-        : 0;
-      return {
-        ...cat,
-        totalTopics,
-        totalPosts,
-        lastTopic: lastTopic && {
-          _id: lastTopic._id,
-          title: lastTopic.title,
-          createdAt: lastTopic.createdAt
-        }
-      };
-    }));
-    res.json(enriched);
+    res.json(cats);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Get Categories By User (enriched)
+// Get Categories By User
 router.get('/categories/user/:userId', async (req, res) => {
   try {
     const cats = await withUser(
       Forumv2Category.find({ userId: req.params.userId })
     ).lean();
-    const enriched = await Promise.all(cats.map(async cat => {
-      const topics = await Forumv2Topic.find({ categoryId: cat._id })
-        .sort({ createdAt: -1 })
-        .select('_id title createdAt')
-        .lean();
-      const totalTopics = topics.length;
-      const lastTopic = topics[0] || null;
-      const topicIds = topics.map(t => t._id);
-      const totalPosts = topicIds.length
-        ? await Forumv2Post.countDocuments({ topicId: { $in: topicIds } })
-        : 0;
-      return {
-        ...cat,
-        totalTopics,
-        totalPosts,
-        lastTopic: lastTopic && {
-          _id: lastTopic._id,
-          title: lastTopic.title,
-          createdAt: lastTopic.createdAt
-        }
-      };
-    }));
-    res.json(enriched);
+    res.json(cats);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Get Single Category (enriched)
+// Get Single Category
 router.get('/categories/:id', async (req, res) => {
   try {
     const cat = await withUser(
       Forumv2Category.findById(req.params.id)
     ).lean();
     if (!cat) return res.status(404).json({ message: 'Category not found' });
-    const topics = await Forumv2Topic.find({ categoryId: cat._id })
-      .sort({ createdAt: -1 })
-      .select('_id title createdAt')
-      .lean();
-    const totalTopics = topics.length;
-    const lastTopic = topics[0] || null;
-    const topicIds = topics.map(t => t._id);
-    const totalPosts = topicIds.length
-      ? await Forumv2Post.countDocuments({ topicId: { $in: topicIds } })
-      : 0;
-    res.json({
-      ...cat,
-      totalTopics,
-      totalPosts,
-      lastTopic: lastTopic && {
-        _id: lastTopic._id,
-        title: lastTopic.title,
-        createdAt: lastTopic.createdAt
-      }
-    });
+    res.json(cat);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -144,7 +81,6 @@ router.delete('/categories/:id', async (req, res) => {
   }
 });
 
-
 // -------------------- Topic Routes --------------------
 
 // Create Topic
@@ -158,133 +94,48 @@ router.post('/topics', async (req, res) => {
   }
 });
 
-// Get All Topics (enriched)
+// Get All Topics
 router.get('/topics', async (req, res) => {
   try {
-    const tops = await withUser(Forumv2Topic.find()).lean();
-    const enriched = await Promise.all(tops.map(async topic => {
-      const posts = await Forumv2Post.find({ topicId: topic._id })
-        .sort({ createdAt: -1 })
-        .select('_id title createdAt')
-        .lean();
-      const totalPosts = posts.length;
-      const lastPost = posts[0] || null;
-      const postIds = posts.map(p => p._id);
-      const totalReplies = postIds.length
-        ? await Forumv2Reply.countDocuments({ postId: { $in: postIds } })
-        : 0;
-      return {
-        ...topic,
-        totalPosts,
-        totalReplies,
-        lastPost: lastPost && {
-          _id: lastPost._id,
-          title: lastPost.title,
-          createdAt: lastPost.createdAt
-        }
-      };
-    }));
-    res.json(enriched);
+    const topics = await withUser(Forumv2Topic.find()).lean();
+    res.json(topics);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Get Topics By Category (enriched)
+// Get Topics By Category
 router.get('/topics/category/:categoryId', async (req, res) => {
   try {
-    const tops = await withUser(
+    const topics = await withUser(
       Forumv2Topic.find({ categoryId: req.params.categoryId })
     ).lean();
-    const enriched = await Promise.all(tops.map(async topic => {
-      const posts = await Forumv2Post.find({ topicId: topic._id })
-        .sort({ createdAt: -1 })
-        .select('_id title createdAt')
-        .lean();
-      const totalPosts = posts.length;
-      const lastPost = posts[0] || null;
-      const postIds = posts.map(p => p._id);
-      const totalReplies = postIds.length
-        ? await Forumv2Reply.countDocuments({ postId: { $in: postIds } })
-        : 0;
-      return {
-        ...topic,
-        totalPosts,
-        totalReplies,
-        lastPost: lastPost && {
-          _id: lastPost._id,
-          title: lastPost.title,
-          createdAt: lastPost.createdAt
-        }
-      };
-    }));
-    res.json(enriched);
+    res.json(topics);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Get Topics By User (enriched)
+// Get Topics By User
 router.get('/topics/user/:userId', async (req, res) => {
   try {
-    const tops = await withUser(
+    const topics = await withUser(
       Forumv2Topic.find({ userId: req.params.userId })
     ).lean();
-    const enriched = await Promise.all(tops.map(async topic => {
-      const posts = await Forumv2Post.find({ topicId: topic._id })
-        .sort({ createdAt: -1 })
-        .select('_id title createdAt')
-        .lean();
-      const totalPosts = posts.length;
-      const lastPost = posts[0] || null;
-      const postIds = posts.map(p => p._id);
-      const totalReplies = postIds.length
-        ? await Forumv2Reply.countDocuments({ postId: { $in: postIds } })
-        : 0;
-      return {
-        ...topic,
-        totalPosts,
-        totalReplies,
-        lastPost: lastPost && {
-          _id: lastPost._id,
-          title: lastPost.title,
-          createdAt: lastPost.createdAt
-        }
-      };
-    }));
-    res.json(enriched);
+    res.json(topics);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Get Single Topic (enriched)
+// Get Single Topic
 router.get('/topics/:id', async (req, res) => {
   try {
     const topic = await withUser(
       Forumv2Topic.findById(req.params.id)
     ).lean();
     if (!topic) return res.status(404).json({ message: 'Topic not found' });
-    const posts = await Forumv2Post.find({ topicId: topic._id })
-      .sort({ createdAt: -1 })
-      .select('_id title createdAt')
-      .lean();
-    const totalPosts = posts.length;
-    const lastPost = posts[0] || null;
-    const postIds = posts.map(p => p._id);
-    const totalReplies = postIds.length
-      ? await Forumv2Reply.countDocuments({ postId: { $in: postIds } })
-      : 0;
-    res.json({
-      ...topic,
-      totalPosts,
-      totalReplies,
-      lastPost: lastPost && {
-        _id: lastPost._id,
-        title: lastPost.title,
-        createdAt: lastPost.createdAt
-      }
-    });
+    res.json(topic);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -314,7 +165,6 @@ router.delete('/topics/:id', async (req, res) => {
   }
 });
 
-
 // -------------------- Post Routes --------------------
 
 // Create Post
@@ -328,129 +178,52 @@ router.post('/posts', async (req, res) => {
   }
 });
 
-// Get All Posts (enriched)
+// Get All Posts
 router.get('/posts', async (req, res) => {
   try {
     const posts = await withUser(Forumv2Post.find()).lean();
-    const enriched = await Promise.all(posts.map(async post => {
-      const totalReplies = await Forumv2Reply.countDocuments({ postId: post._id });
-      const last = await Forumv2Reply.find({ postId: post._id })
-        .sort({ createdAt: -1 })
-        .limit(1)
-        .select('_id createdAt content.html')
-        .lean();
-      const lastReply = last[0] || null;
-      return {
-        ...post,
-        totalReplies,
-        upvotes:   post.upvotes   || 0,
-        downvotes: post.downvotes || 0,
-        lastReply: lastReply && {
-          _id: lastReply._id,
-          content: lastReply['content.html'] || lastReply.content.html,
-          createdAt: lastReply.createdAt
-        }
-      };
-    }));
-    res.json(enriched);
+    res.json(posts);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Get Posts By Topic (enriched)
+// Get Posts By Topic
 router.get('/posts/topic/:topicId', async (req, res) => {
   try {
     const posts = await withUser(
       Forumv2Post.find({ topicId: req.params.topicId })
     ).lean();
-    const enriched = await Promise.all(posts.map(async post => {
-      const totalReplies = await Forumv2Reply.countDocuments({ postId: post._id });
-      const last = await Forumv2Reply.find({ postId: post._id })
-        .sort({ createdAt: -1 })
-        .limit(1)
-        .select('_id createdAt content.html')
-        .lean();
-      const lastReply = last[0] || null;
-      return {
-        ...post,
-        totalReplies,
-        upvotes:   post.upvotes   || 0,
-        downvotes: post.downvotes || 0,
-        lastReply: lastReply && {
-          _id: lastReply._id,
-          content: lastReply['content.html'] || lastReply.content.html,
-          createdAt: lastReply.createdAt
-        }
-      };
-    }));
-    res.json(enriched);
+    res.json(posts);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Get Posts By User (enriched)
+// Get Posts By User
 router.get('/posts/user/:userId', async (req, res) => {
   try {
     const posts = await withUser(
       Forumv2Post.find({ userId: req.params.userId })
     ).lean();
-    const enriched = await Promise.all(posts.map(async post => {
-      const totalReplies = await Forumv2Reply.countDocuments({ postId: post._id });
-      const last = await Forumv2Reply.find({ postId: post._id })
-        .sort({ createdAt: -1 })
-        .limit(1)
-        .select('_id createdAt content.html')
-        .lean();
-      const lastReply = last[0] || null;
-      return {
-        ...post,
-        totalReplies,
-        upvotes:   post.upvotes   || 0,
-        downvotes: post.downvotes || 0,
-        lastReply: lastReply && {
-          _id: lastReply._id,
-          content: lastReply['content.html'] || lastReply.content.html,
-          createdAt: lastReply.createdAt
-        }
-      };
-    }));
-    res.json(enriched);
+    res.json(posts);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Get Single Post (enriched)
+// Get Single Post
 router.get('/posts/:id', async (req, res) => {
   try {
     const post = await withUser(
       Forumv2Post.findById(req.params.id)
     ).lean();
     if (!post) return res.status(404).json({ message: 'Post not found' });
-    const totalReplies = await Forumv2Reply.countDocuments({ postId: post._id });
-    const last = await Forumv2Reply.find({ postId: post._id })
-      .sort({ createdAt: -1 })
-      .limit(1)
-      .select('_id createdAt content.html')
-      .lean();
-    const lastReply = last[0] || null;
-    res.json({
-      ...post,
-      totalReplies,
-      upvotes:   post.upvotes   || 0,
-      downvotes: post.downvotes || 0,
-      lastReply: lastReply && {
-        _id: lastReply._id,
-        content: lastReply['content.html'] || lastReply.content.html,
-        createdAt: lastReply.createdAt
-      }
-    });
+    res.json(post);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-}); 
+});
 
 // Update Post
 router.put('/posts/:id', async (req, res) => {
@@ -476,7 +249,6 @@ router.delete('/posts/:id', async (req, res) => {
   }
 });
 
-
 // -------------------- Reply Routes --------------------
 
 // Create Reply
@@ -490,24 +262,26 @@ router.post('/replies', async (req, res) => {
   }
 });
 
-// Get All Replies (with user + optional filter)
+// Get All Replies
 router.get('/replies', async (req, res) => {
   try {
     const filter = {};
     if (req.query.postId)  filter.postId  = req.query.postId;
     if (req.query.replyId) filter.replyId = req.query.replyId;
 
-    const replies = await withUser(Forumv2Reply.find(filter));
+    const replies = await withUser(Forumv2Reply.find(filter)).lean();
     res.json(replies);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Get Single Reply (with user)
+// Get Single Reply
 router.get('/replies/:id', async (req, res) => {
   try {
-    const reply = await withUser(Forumv2Reply.findById(req.params.id));
+    const reply = await withUser(
+      Forumv2Reply.findById(req.params.id)
+    ).lean();
     if (!reply) return res.status(404).json({ message: 'Reply not found' });
     res.json(reply);
   } catch (err) {
