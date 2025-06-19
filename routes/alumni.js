@@ -451,14 +451,14 @@ alumniRoutes.post("/login", async (req, res) => {
   const { email, password, captchaToken } = req.body;
 
   try {
-    const captchaVerifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${process.env.RECAPTCHA_SECRET}&response=${captchaToken}`;
+    // const captchaVerifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${process.env.RECAPTCHA_SECRET}&response=${captchaToken}`;
 
-    const captchaResponse = await axios.post(captchaVerifyUrl);
-    if (!captchaResponse.data.success) {
-      return res
-        .status(400)
-        .json("reCAPTCHA validation failed. Please try again.");
-    }
+    // const captchaResponse = await axios.post(captchaVerifyUrl);
+    // if (!captchaResponse.data.success) {
+    //   return res
+    //     .status(400)
+    //     .json("reCAPTCHA validation failed. Please try again.");
+    // }
     const alumni = await Alumni.findOne({ email: email });
 
     if (!alumni) {
