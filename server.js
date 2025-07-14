@@ -55,6 +55,7 @@ const io = new Server(server, {
       "https://api.excelpublicschool.com",
       "https://alumni.excelpublicschool.com",
       "https://alumnify.in",
+      'capacitor://localhost'
     ],
     credentials: true,
   },
@@ -70,22 +71,31 @@ app.use(bodyParser.urlencoded({ extended: true, limit: "100mb" }));
 app.use(bodyParser.json({ extended: true, limit: "100mb" }));
 app.use(
   cors({
-    origin: [
-      "http://localhost:3000",
-      "http://localhost:3001",
-      "https://alumni-frontend-4ca1.vercel.app",
-      "https://alumni-p-eps.vercel.app",
-      "https://api.excelpublicschool.com",
-      "https://api.excelpublicschool.com/alumni/login",
-      "https://api.excelpublicschool.com/settings/",
-      "https://alumni.excelpublicschool.com",
-      "https://alumnify.in",
-      "https://alumnify.in:3000",
-      'capacitor://localhost'
+    origin: ['*'
+      // "http://localhost:3000",
+      // "http://localhost:3001",
+      // "https://alumni-frontend-4ca1.vercel.app",
+      // "https://alumni-p-eps.vercel.app",
+      // "https://api.excelpublicschool.com",
+      // "https://api.excelpublicschool.com/alumni/login",
+      // "https://api.excelpublicschool.com/settings/",
+      // "https://alumni.excelpublicschool.com",
+      // "https://alumnify.in",
+      // "https://alumnify.in:3000",
+      // 'capacitor://localhost'
     ],
     credentials: true,
   })
 );
+
+const corsOptions = {
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 200
+};
+
 //app.use(cors());
 // console.log("directory name", __dirname);
 
