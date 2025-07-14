@@ -81,6 +81,7 @@ app.use(
       "https://alumni.excelpublicschool.com",
       "https://alumnify.in",
       "https://alumnify.in:3000",
+      'capacitor://localhost'
     ],
     credentials: true,
   })
