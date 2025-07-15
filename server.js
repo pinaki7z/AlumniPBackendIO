@@ -69,9 +69,18 @@ const uploadRoutes = require("./routes/upload");
 
 app.use(bodyParser.urlencoded({ extended: true, limit: "100mb" }));
 app.use(bodyParser.json({ extended: true, limit: "100mb" }));
+
+const corsOptions = {
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 200
+};
 app.use(
-  cors({
-    origin: ['*'
+  cors(corsOptions)
+);
+
       // "http://localhost:3000",
       // "http://localhost:3001",
       // "https://alumni-frontend-4ca1.vercel.app",
@@ -83,18 +92,8 @@ app.use(
       // "https://alumnify.in",
       // "https://alumnify.in:3000",
       // 'capacitor://localhost'
-    ],
-    credentials: true,
-  })
-);
 
-const corsOptions = {
-  origin: true,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  optionsSuccessStatus: 200
-};
+
 
 //app.use(cors());
 // console.log("directory name", __dirname);
