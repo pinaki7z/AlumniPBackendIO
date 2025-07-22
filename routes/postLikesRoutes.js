@@ -36,38 +36,51 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Create like
-    const like = new Like({
-      postId,
-      userId,
-      userName,
-      likeType
-    });
+    // Check if user already liked the post
+    const existingLike = await Like.findOne({ postId, userId });
+    if (existingLike) {
+      // Remove the like
+      await Like.findByIdAndDelete(existingLike._id);
 
-    await like.save();
+      // Update post counter
+      const counterField = getCounterField(existingLike.likeType);
+      await Post.findByIdAndUpdate(postId, {
+        $inc: { [counterField]: -1 }
+      });
 
-    // Update post counter
-    const counterField = getCounterField(likeType);
-    await Post.findByIdAndUpdate(postId, {
-      $inc: { [counterField]: 1 }
-    });
+      res.status(200).json({
+        success: true,
+        message: 'Like removed successfully',
+        data: existingLike
+      });
+    } else {
+      // Create like
+      const like = new Like({
+        postId,
+        userId,
+        userName,
+        likeType
+      });
 
-    // Populate user info
-    await like.populate('userId', 'firstName lastName userName profilePicture');
+      await like.save();
 
-    res.status(201).json({
-      success: true,
-      message: 'Like added successfully',
-      data: like
-    });
+      // Update post counter
+      const counterField = getCounterField(likeType);
+      await Post.findByIdAndUpdate(postId, {
+        $inc: { [counterField]: 1 }
+      });
 
-  } catch (error) {
-    if (error.code === 11000) {
-      return res.status(409).json({ 
-        success: false, 
-        message: 'You have already liked this post' 
+      // Populate user info
+      await like.populate('userId', 'firstName lastName userName profilePicture');
+
+      res.status(201).json({
+        success: true,
+        message: 'Like added successfully',
+        data: like
       });
     }
+
+  } catch (error) {
     res.status(500).json({ 
       success: false, 
       message: 'Server error', 
