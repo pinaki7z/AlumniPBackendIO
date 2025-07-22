@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Like = require('../models/postLikes');
 const Post = require('../models/post');
+const { default: mongoose } = require('mongoose');
 
 // Helper function to map likeType to Post counter field
 const getCounterField = (likeType) => {
@@ -376,14 +377,18 @@ router.delete('/toggle/:postId/:userId', async (req, res) => {
 });
 
 // GET - Get like counts for a post
+
 router.get('/counts/:postId', async (req, res) => {
   try {
     const { postId } = req.params;
 
+    // Convert postId to ObjectId properly
+    const objectId = new mongoose.Types.ObjectId(postId);
+
     // Aggregate likes by type
     const likeCounts = await Like.aggregate([
-      { $match: { postId: new require('mongoose').Types.ObjectId(postId) } },
-      { 
+      { $match: { postId: objectId } },
+      {
         $group: {
           _id: '$likeType',
           count: { $sum: 1 }
@@ -411,12 +416,11 @@ router.get('/counts/:postId', async (req, res) => {
     });
 
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error', 
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
     });
   }
 });
-
 module.exports = router;
