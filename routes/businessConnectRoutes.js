@@ -1,6 +1,8 @@
 // businessRoutes.js
 const express = require('express');
 const Business = require('../models/businessSchema');
+const Razorpay = require('razorpay');
+
 const uploadv2 = require("../services/s3");
 const router = express.Router();
 
@@ -382,24 +384,54 @@ router.get('/stats/admin', async (req, res) => {
 
 
 
-// toggle like (adds or removes current user's like)
+
+// Update the existing like route to handle proper toggle
 router.patch('/:id/like', async (req, res) => {
-  const { userId } = req.body;                 // frontend sends logged-in user id
-  const biz = await Business.findById(req.params.id);
-  if (!biz) return res.status(404).json({ success:false, message:'Business not found' });
+  try {
+    const { userId } = req.body;
+    const business = await Business.findById(req.params.id);
+    
+    if (!business) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Business not found' 
+      });
+    }
 
-  const idx = biz.likedBy.indexOf(userId);
-  if (idx === -1) {
-    biz.likedBy.push(userId);
-    biz.likes += 1;
-  } else {
-    biz.likedBy.splice(idx, 1);
-    biz.likes = Math.max(biz.likes - 1, 0);
+    const userIdStr = String(userId);
+    const likedByStrings = business.likedBy.map(id => String(id));
+    const idx = likedByStrings.indexOf(userIdStr);
+    
+    let isLiked;
+    if (idx === -1) {
+      // User hasn't liked, so add like
+      business.likedBy.push(userId);
+      business.likes = (business.likes || 0) + 1;
+      isLiked = true;
+    } else {
+      // User has liked, so remove like
+      business.likedBy.splice(idx, 1);
+      business.likes = Math.max((business.likes || 0) - 1, 0);
+      isLiked = false;
+    }
+    
+    await business.save();
+    
+    res.json({ 
+      success: true, 
+      likes: business.likes, 
+      isLiked: isLiked,
+      message: isLiked ? 'Business liked' : 'Business unliked'
+    });
+
+  } catch (error) {
+    console.error('Toggle like error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update like status'
+    });
   }
-  await biz.save();
-  res.json({ success:true, likes:biz.likes, liked: idx === -1 });
 });
-
 // add top-level comment
 router.post('/:id/comments', async (req, res) => {
   const { userId, userName, userEmail, text } = req.body;
@@ -439,6 +471,38 @@ router.get('/:id/comments', async (req, res) => {
   res.json({ success:true, comments: nest(biz.comments) });
 
 });
+
+
+// Get like status for current user
+router.get('/:id/like-status/:userId', async (req, res) => {
+  try {
+    const { id, userId } = req.params;
+    const business = await Business.findById(id);
+    
+    if (!business) {
+      return res.status(404).json({
+        success: false,
+        message: 'Business not found'
+      });
+    }
+
+    const isLiked = business.likedBy.includes(userId);
+    
+    res.json({
+      success: true,
+      isLiked: isLiked,
+      likes: business.likes || 0
+    });
+
+  } catch (error) {
+    console.error('Get like status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get like status'
+    });
+  }
+});
+
 
 // Update business shares count
 router.patch('/:id/share', async (req, res) => {
@@ -646,6 +710,131 @@ router.get('/all', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch businesses'
+    });
+  }
+});
+
+
+
+
+// Razorpay payment verification and funding update
+// Backend route: /api/business/:id/payment-success
+router.post('/:id/payment-success', async (req, res) => {
+  try {
+    const { amount, razorpayPaymentId, razorpayOrderId, razorpaySignature } = req.body;
+    const businessId = req.params.id;
+
+    // Validate required fields
+    if (!razorpayPaymentId || !razorpayOrderId || !razorpaySignature || !amount) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required payment details'
+      });
+    }
+
+    // Verify signature using Razorpay SDK (recommended)
+    const crypto = require('crypto');
+    const expectedSignature = crypto
+      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || 'oUfVrcCHSIfajJDQgMIeKmSG')
+      .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+      .digest('hex');
+
+    if (expectedSignature !== razorpaySignature) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid payment signature'
+      });
+    }
+
+    // Update funding raised
+    const business = await Business.findByIdAndUpdate(
+      businessId,
+      { 
+        $inc: { fundingRaised: Number(amount) }
+      },
+      { new: true }
+    );
+
+    if (!business) {
+      return res.status(404).json({
+        success: false,
+        message: 'Business not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Payment of ₹${amount.toLocaleString()} successful! Funding updated.`,
+      business: business,
+      paymentDetails: {
+        paymentId: razorpayPaymentId,
+        orderId: razorpayOrderId,
+        amount: amount
+      }
+    });
+
+  } catch (error) {
+    console.error('Payment success error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to process payment success'
+    });
+  }
+});
+// Create Razorpay order
+// Backend route: /api/business/:id/create-order
+router.post('/:id/create-order', async (req, res) => {
+  try {
+    const { amount } = req.body;
+    const businessId = req.params.id;
+
+    // Validate inputs
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid amount'
+      });
+    }
+
+    const business = await Business.findById(businessId);
+    if (!business) {
+      return res.status(404).json({
+        success: false,
+        message: 'Business not found'
+      });
+    }
+
+    // If using actual Razorpay SDK (recommended)
+    const razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID ||'rzp_test_9biOcO86B9dZyQ',
+      key_secret: process.env.RAZORPAY_KEY_SECRET || 'oUfVrcCHSIfajJDQgMIeKmSG'
+    });
+
+  const rawReceipt = `receipt_${Date.now()}_${businessId}`;
+const receipt = rawReceipt.slice(0, 40);
+
+const options = {
+  amount: amount * 100,
+  currency: 'INR',
+  receipt,
+  payment_capture: 1
+};
+    const order = await razorpay.orders.create(options);
+    
+    res.json({
+      success: true,
+      orderId: order.id,
+      amount: amount,
+      currency: 'INR',
+      businessName: business.businessName
+    });
+
+  } catch (error) {
+    console.error('Create order error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create order',
+      error: error.message
     });
   }
 });
