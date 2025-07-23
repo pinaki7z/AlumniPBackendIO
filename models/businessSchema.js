@@ -1,6 +1,16 @@
 // models/businessSchema.js
 const mongoose = require('mongoose');
 
+const commentSchema = new mongoose.Schema({
+  authorId:    { type: mongoose.Schema.Types.ObjectId, ref: 'Alumni', required: true },
+  authorName:  { type: String, required: true },
+  authorEmail: { type: String },
+  text:        { type: String, required: true, trim: true },
+  parent:      { type: mongoose.Schema.Types.ObjectId, ref: 'Comment', default: null },
+  createdAt:   { type: Date, default: Date.now }
+});
+
+
 const businessSchema = new mongoose.Schema({
   businessName:         { type: String, required: true, trim: true },
   industry:             { type: String, required: true },
@@ -26,7 +36,8 @@ const businessSchema = new mongoose.Schema({
   businessPlan:         { type: String },
   status:               { type: String, enum: ['pending','verified','rejected'], default: 'pending' },
   likes:                { type: Number, default: 0 },
-  comments:             { type: Number, default: 0 },
+  likedBy:    [{ type: mongoose.Schema.Types.ObjectId, ref: 'Alumni' }],   // NEW
+  comments:   [commentSchema],  
   shares:               { type: Number, default: 0 },
   businessModel:        { type: String },
   revenueStreams:       [{ type: String }],

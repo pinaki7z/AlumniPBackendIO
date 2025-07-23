@@ -382,41 +382,62 @@ router.get('/stats/admin', async (req, res) => {
 
 
 
-// Update business likes
+// toggle like (adds or removes current user's like)
 router.patch('/:id/like', async (req, res) => {
-  try {
-    const { action } = req.body; // 'like' or 'unlike'
-    
-    const business = await Business.findById(req.params.id);
-    
-    if (!business) {
-      return res.status(404).json({
-        success: false,
-        message: 'Business not found'
-      });
-    }
+  const { userId } = req.body;                 // frontend sends logged-in user id
+  const biz = await Business.findById(req.params.id);
+  if (!biz) return res.status(404).json({ success:false, message:'Business not found' });
 
-    if (action === 'like') {
-      business.likes = (business.likes || 0) + 1;
-    } else if (action === 'unlike' && business.likes > 0) {
-      business.likes = business.likes - 1;
-    }
-
-    await business.save();
-
-    res.json({
-      success: true,
-      likes: business.likes,
-      message: action === 'like' ? 'Business liked' : 'Business unliked'
-    });
-
-  } catch (error) {
-    console.error('Update likes error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update likes'
-    });
+  const idx = biz.likedBy.indexOf(userId);
+  if (idx === -1) {
+    biz.likedBy.push(userId);
+    biz.likes += 1;
+  } else {
+    biz.likedBy.splice(idx, 1);
+    biz.likes = Math.max(biz.likes - 1, 0);
   }
+  await biz.save();
+  res.json({ success:true, likes:biz.likes, liked: idx === -1 });
+});
+
+// add top-level comment
+router.post('/:id/comments', async (req, res) => {
+  const { userId, userName, userEmail, text } = req.body;
+  const biz = await Business.findById(req.params.id);
+  if (!biz) return res.status(404).json({ success:false, message:'Business not found' });
+
+  biz.comments.push({ authorId:userId, authorName:userName, authorEmail:userEmail, text });
+  await biz.save();
+  res.status(201).json({ success:true });
+});
+
+// add reply
+router.post('/:id/comments/:commentId/reply', async (req, res) => {
+  const { userId, userName, userEmail, text } = req.body;
+  const biz = await Business.findById(req.params.id);
+  if (!biz) return res.status(404).json({ success:false, message:'Business not found' });
+
+  const parent = biz.comments.id(req.params.commentId);
+  if (!parent) return res.status(404).json({ success:false, message:'Comment not found' });
+
+  biz.comments.push({ authorId:userId, authorName:userName, authorEmail:userEmail, text, parent: parent._id });
+  await biz.save();
+  res.status(201).json({ success:true });
+});
+
+// get comments (nested)
+router.get('/:id/comments', async (req, res) => {
+  const biz = await Business.findById(req.params.id).lean();
+  if (!biz) return res.status(404).json({ success:false, message:'Business not found' });
+
+  const nest = (list, parent = null) =>{
+
+    const safeList = list || [];
+    return safeList.filter(c => String(c.parent) === String(parent)).map(c => ({ ...c, replies: nest(list, c._id) }));
+
+  }
+  res.json({ success:true, comments: nest(biz.comments) });
+
 });
 
 // Update business shares count
