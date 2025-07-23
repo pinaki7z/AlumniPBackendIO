@@ -31,6 +31,7 @@ const groupMemberRoutes = require("./routes/groupMemberRoutes");
 const forumv2Routes = require("./routes/forumv2Routes");
 const postCommentRoutes = require("./routes/postCommentRoutes");
 const postLikeRoutes = require("./routes/postLikesRoutes");
+const businessConnectRoutes = require("./routes/businessConnectRoutes");
 
 
 const Message = require("./models/message");
@@ -145,6 +146,7 @@ app.use("/groupMember", groupMemberRoutes);
 app.use("/forumv2", forumv2Routes);
 app.use("/postLike", postLikeRoutes);
 app.use("/postComment", postCommentRoutes);
+app.use("/api/business", businessConnectRoutes);
 
 const secretKey =
   "f3c8a3c9b8a9f0b2440a646f3a5b8f9e6d6e46555a4b2b5c6d7c8d9e0a1b2c3d4f5e6a7b8c9d0e1f2a3b4c5d6e7f8g9h0";
