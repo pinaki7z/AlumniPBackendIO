@@ -1,8 +1,16 @@
-// routes/sponsorshipRoutes.js
+// routes/sponsorshipRoutes.js - Complete Enhanced Routes
 const express = require('express');
 const Sponsorship = require('../models/sponsorshipSchema');
 const uploadv2 = require("../services/s3");
+const Razorpay = require('razorpay');
+const crypto = require('crypto');
 const router = express.Router();
+
+// Initialize Razorpay
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_9biOcO86B9dZyQ',
+  key_secret: process.env.RAZORPAY_KEY_SECRET || 'oUfVrcCHSIfajJDQgMIeKmSG'
+});
 
 // Image upload endpoint
 router.post('/upload-image', uploadv2.single('image'), async (req, res) => {
@@ -52,7 +60,7 @@ router.post('/upload-document', uploadv2.single('document'), async (req, res) =>
   }
 });
 
-// Create new sponsorship (goes to pending verification)
+// Create new sponsorship
 router.post('/create', async (req, res) => {
   try {
     const {
@@ -60,7 +68,8 @@ router.post('/create', async (req, res) => {
       amount, duration, sponsorName, sponsorEmail, sponsorPhone, sponsorWebsite,
       sponsorLogo, eventName, eventDate, eventLocation, expectedAudience,
       targetDemographic, benefits, deliverables, marketingReach, images,
-      proposalDocument, priority, tags, expiresAt, ownerEmail, createdBy
+      proposalDocument, priority, tags, expiresAt, ownerEmail, createdBy,
+      fundingGoal
     } = req.body;
 
     if (!title || !description || !category || !sponsorshipType || !amount || !sponsorName || !sponsorEmail) {
@@ -85,7 +94,9 @@ router.post('/create', async (req, res) => {
       marketingReach, images: images || [], proposalDocument,
       priority: priority || 'medium', tags: tags || [],
       expiresAt: expiresAt ? new Date(expiresAt) : null,
-      verificationStatus: 'pending'
+      verificationStatus: 'pending',
+      fundingRaised: 0,
+      fundingGoal: fundingGoal ? Number(fundingGoal) : Number(amount)
     });
 
     const savedSponsorship = await newSponsorship.save();
@@ -190,7 +201,7 @@ router.get('/all', async (req, res) => {
   }
 });
 
-// Get single sponsorship for editing
+// Get single sponsorship for editing/viewing
 router.get('/:id', async (req, res) => {
   try {
     const sponsorship = await Sponsorship.findById(req.params.id);
@@ -455,6 +466,384 @@ router.get('/admin/pending', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch pending sponsorships'
+    });
+  }
+});
+
+// Like/Unlike sponsorship
+router.patch('/:id/like', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    const sponsorship = await Sponsorship.findById(req.params.id);
+    
+    if (!sponsorship) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Sponsorship not found' 
+      });
+    }
+
+    const userIdStr = String(userId);
+    const likedByStrings = sponsorship.likedBy.map(id => String(id));
+    const idx = likedByStrings.indexOf(userIdStr);
+    
+    let isLiked;
+    if (idx === -1) {
+      sponsorship.likedBy.push(userId);
+      sponsorship.likes = (sponsorship.likes || 0) + 1;
+      isLiked = true;
+    } else {
+      sponsorship.likedBy.splice(idx, 1);
+      sponsorship.likes = Math.max((sponsorship.likes || 0) - 1, 0);
+      isLiked = false;
+    }
+    
+    await sponsorship.save();
+    
+    res.json({ 
+      success: true, 
+      likes: sponsorship.likes, 
+      isLiked: isLiked,
+      message: isLiked ? 'Sponsorship liked' : 'Sponsorship unliked'
+    });
+
+  } catch (error) {
+    console.error('Toggle like error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update like status'
+    });
+  }
+});
+
+// Get like status for current user
+router.get('/:id/like-status/:userId', async (req, res) => {
+  try {
+    const { id, userId } = req.params;
+    const sponsorship = await Sponsorship.findById(id);
+    
+    if (!sponsorship) {
+      return res.status(404).json({
+        success: false,
+        message: 'Sponsorship not found'
+      });
+    }
+
+    const isLiked = sponsorship.likedBy.includes(userId);
+    
+    res.json({
+      success: true,
+      isLiked: isLiked,
+      likes: sponsorship.likes || 0
+    });
+
+  } catch (error) {
+    console.error('Get like status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get like status'
+    });
+  }
+});
+
+// Share sponsorship
+router.patch('/:id/share', async (req, res) => {
+  try {
+    const sponsorship = await Sponsorship.findByIdAndUpdate(
+      req.params.id,
+      { $inc: { shares: 1 } },
+      { new: true }
+    );
+
+    if (!sponsorship) {
+      return res.status(404).json({
+        success: false,
+        message: 'Sponsorship not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      shares: sponsorship.shares,
+      message: 'Share count updated'
+    });
+
+  } catch (error) {
+    console.error('Update shares error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update shares'
+    });
+  }
+});
+
+// Add top-level comment
+router.post('/:id/comments', async (req, res) => {
+  try {
+    const { userId, userName, userEmail, text } = req.body;
+    const sponsorship = await Sponsorship.findById(req.params.id);
+    
+    if (!sponsorship) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Sponsorship not found' 
+      });
+    }
+
+    sponsorship.comments.push({ 
+      authorId: userId, 
+      authorName: userName, 
+      authorEmail: userEmail, 
+      text 
+    });
+    
+    await sponsorship.save();
+    res.status(201).json({ success: true });
+  } catch (error) {
+    console.error('Add comment error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add comment'
+    });
+  }
+});
+
+// Add reply to comment
+router.post('/:id/comments/:commentId/reply', async (req, res) => {
+  try {
+    const { userId, userName, userEmail, text } = req.body;
+    const sponsorship = await Sponsorship.findById(req.params.id);
+    
+    if (!sponsorship) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Sponsorship not found' 
+      });
+    }
+
+    const parent = sponsorship.comments.id(req.params.commentId);
+    if (!parent) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Comment not found' 
+      });
+    }
+
+    sponsorship.comments.push({ 
+      authorId: userId, 
+      authorName: userName, 
+      authorEmail: userEmail, 
+      text, 
+      parent: parent._id 
+    });
+    
+    await sponsorship.save();
+    res.status(201).json({ success: true });
+  } catch (error) {
+    console.error('Add reply error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add reply'
+    });
+  }
+});
+
+// Get comments (nested)
+router.get('/:id/comments', async (req, res) => {
+  try {
+    const sponsorship = await Sponsorship.findById(req.params.id).lean();
+    
+    if (!sponsorship) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Sponsorship not found' 
+      });
+    }
+
+    const nest = (list, parent = null) => {
+      const safeList = list || [];
+      return safeList
+        .filter(c => String(c.parent) === String(parent))
+        .map(c => ({ ...c, replies: nest(list, c._id) }));
+    };
+    
+    res.json({ 
+      success: true, 
+      comments: nest(sponsorship.comments) 
+    });
+  } catch (error) {
+    console.error('Get comments error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch comments'
+    });
+  }
+});
+
+// Create Razorpay order for sponsorship donation
+router.post('/:id/create-order', async (req, res) => {
+  try {
+    const { amount } = req.body;
+    const sponsorshipId = req.params.id;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid amount'
+      });
+    }
+
+    const sponsorship = await Sponsorship.findById(sponsorshipId);
+    if (!sponsorship) {
+      return res.status(404).json({
+        success: false,
+        message: 'Sponsorship not found'
+      });
+    }
+
+    const rawReceipt = `receipt_${Date.now()}_${sponsorshipId}`;
+    const receipt = rawReceipt.slice(0, 40);
+
+    const options = {
+      amount: amount * 100,
+      currency: 'INR',
+      receipt,
+      payment_capture: 1
+    };
+
+    const order = await razorpay.orders.create(options);
+    
+    res.json({
+      success: true,
+      orderId: order.id,
+      amount: amount,
+      currency: 'INR',
+      sponsorshipName: sponsorship.title
+    });
+
+  } catch (error) {
+    console.error('Create order error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create order',
+      error: error.message
+    });
+  }
+});
+
+// Handle successful payment
+router.post('/:id/payment-success', async (req, res) => {
+  try {
+    const { amount, razorpayPaymentId, razorpayOrderId, razorpaySignature } = req.body;
+    const sponsorshipId = req.params.id;
+
+    // Verify signature
+    const expectedSignature = crypto
+      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || 'oUfVrcCHSIfajJDQgMIeKmSG')
+      .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+      .digest('hex');
+
+    if (expectedSignature !== razorpaySignature) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid payment signature'
+      });
+    }
+
+    // Update funding raised
+    const sponsorship = await Sponsorship.findByIdAndUpdate(
+      sponsorshipId,
+      { $inc: { fundingRaised: Number(amount) } },
+      { new: true }
+    );
+
+    if (!sponsorship) {
+      return res.status(404).json({
+        success: false,
+        message: 'Sponsorship not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Payment of ₹${amount.toLocaleString()} successful! Funding updated.`,
+      sponsorship: sponsorship,
+      paymentDetails: {
+        paymentId: razorpayPaymentId,
+        orderId: razorpayOrderId,
+        amount: amount
+      }
+    });
+
+  } catch (error) {
+    console.error('Payment success error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to process payment success'
+    });
+  }
+});
+
+// Update funding raised amount (for admin only)
+router.patch('/:id/funding', async (req, res) => {
+  try {
+    const { operation, amount } = req.body;
+    
+    if (!['add', 'remove'].includes(operation)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid operation. Use "add" or "remove"'
+      });
+    }
+
+    if (typeof amount !== 'number' || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Amount must be a positive number'
+      });
+    }
+
+    const sponsorship = await Sponsorship.findById(req.params.id);
+    
+    if (!sponsorship) {
+      return res.status(404).json({
+        success: false,
+        message: 'Sponsorship not found'
+      });
+    }
+
+    let newFundingRaised = sponsorship.fundingRaised || 0;
+    
+    if (operation === 'add') {
+      newFundingRaised += amount;
+    } else if (operation === 'remove') {
+      newFundingRaised -= amount;
+      newFundingRaised = Math.max(0, newFundingRaised);
+    }
+
+    const updatedSponsorship = await Sponsorship.findByIdAndUpdate(
+      req.params.id,
+      { fundingRaised: newFundingRaised },
+      { new: true }
+    );
+
+    res.json({
+      success: true,
+      message: `Successfully ${operation === 'add' ? 'added' : 'removed'} ₹${amount.toLocaleString()} ${operation === 'add' ? 'to' : 'from'} funding`,
+      sponsorship: updatedSponsorship,
+      operationDetails: {
+        operation,
+        amount,
+        previousAmount: sponsorship.fundingRaised || 0,
+        newAmount: newFundingRaised
+      }
+    });
+
+  } catch (error) {
+    console.error('Update funding error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update funding progress'
     });
   }
 });

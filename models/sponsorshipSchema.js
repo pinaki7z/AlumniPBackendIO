@@ -1,5 +1,14 @@
-// models/sponsorshipSchema.js
+// models/sponsorshipSchema.js - Enhanced Schema
 const mongoose = require('mongoose');
+
+const commentSchema = new mongoose.Schema({
+  authorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Alumni', required: true },
+  authorName: { type: String, required: true },
+  authorEmail: { type: String },
+  text: { type: String, required: true, trim: true },
+  parent: { type: mongoose.Schema.Types.ObjectId, ref: 'Comment', default: null },
+  createdAt: { type: Date, default: Date.now }
+});
 
 const sponsorshipSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true },
@@ -10,6 +19,10 @@ const sponsorshipSchema = new mongoose.Schema({
   amount: { type: Number, required: true },
   currency: { type: String, default: 'INR' },
   duration: { type: String },
+  
+  // Enhanced funding tracking
+  fundingGoal: { type: Number, default: 0 },
+  fundingRaised: { type: Number, default: 0 },
   
   // Sponsor Information
   sponsorName: { type: String, required: true },
@@ -53,6 +66,12 @@ const sponsorshipSchema = new mongoose.Schema({
   verifiedBy: { type: String },
   verificationDate: { type: Date },
   rejectionReason: { type: String },
+  
+  // Social features
+  likes: { type: Number, default: 0 },
+  likedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Alumni' }],
+  comments: [commentSchema],
+  shares: { type: Number, default: 0 },
   
   priority: { type: String, enum: ['high', 'medium', 'low'], default: 'medium' },
   tags: [{ type: String }],
