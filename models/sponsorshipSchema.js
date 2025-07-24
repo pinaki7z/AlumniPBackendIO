@@ -5,11 +5,11 @@ const sponsorshipSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true },
   description: { type: String, required: true },
   detailedDescription: { type: String },
-  category: { type: String, required: true }, // 'Event', 'Product', 'Service', 'Content', 'Community'
-  sponsorshipType: { type: String, required: true }, // 'Title', 'Presenting', 'Supporting', 'Media', 'Venue'
+  category: { type: String, required: true },
+  sponsorshipType: { type: String, required: true },
   amount: { type: Number, required: true },
   currency: { type: String, default: 'INR' },
-  duration: { type: String }, // '1 month', '3 months', '6 months', '1 year'
+  duration: { type: String },
   
   // Sponsor Information
   sponsorName: { type: String, required: true },
@@ -17,6 +17,10 @@ const sponsorshipSchema = new mongoose.Schema({
   sponsorPhone: { type: String },
   sponsorWebsite: { type: String },
   sponsorLogo: { type: String },
+  
+  // Owner tracking
+  ownerEmail: { type: String, required: true },
+  createdBy: { type: String, required: true },
   
   // Event/Project Information
   eventName: { type: String },
@@ -35,8 +39,21 @@ const sponsorshipSchema = new mongoose.Schema({
   documents: [{ type: String }],
   proposalDocument: { type: String },
   
-  // Status and Engagement
-  status: { type: String, enum: ['active', 'pending', 'completed', 'cancelled'], default: 'pending' },
+  // Status and Verification
+  status: { 
+    type: String, 
+    enum: ['draft', 'pending', 'verified', 'rejected', 'completed', 'cancelled'], 
+    default: 'pending' 
+  },
+  verificationStatus: {
+    type: String,
+    enum: ['pending', 'verified', 'rejected'],
+    default: 'pending'
+  },
+  verifiedBy: { type: String },
+  verificationDate: { type: Date },
+  rejectionReason: { type: String },
+  
   priority: { type: String, enum: ['high', 'medium', 'low'], default: 'medium' },
   tags: [{ type: String }],
   
@@ -51,4 +68,9 @@ const sponsorshipSchema = new mongoose.Schema({
   expiresAt: { type: Date }
 });
 
-module.exports = mongoose.model('Sponsorshipv2Connect', sponsorshipSchema);
+// Index for better query performance
+sponsorshipSchema.index({ verificationStatus: 1, createdAt: -1 });
+sponsorshipSchema.index({ ownerEmail: 1 });
+sponsorshipSchema.index({ category: 1 });
+
+module.exports = mongoose.model('SponsorshipConnect', sponsorshipSchema);
