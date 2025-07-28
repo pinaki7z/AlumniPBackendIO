@@ -1,21 +1,15 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const axios = require("axios");
 require("dotenv").config();
 const alumniRoutes = express.Router();
 const verifyToken = require("../utils");
 const nodemailer = require("nodemailer");
 const validateEmail = require("../middleware/validateEmail");
 const validatePassword = require("../middleware/validatePassword");
-const checkProfileLevel = require("../middleware/checkProfileLevel");
-const Session = require("../models/session");
-const checkGroupExists = require("../middleware/checkGroupExists");
-const mongoose = require("mongoose");
 const Notification = require("../models/notification");
 const Company = require("../models/company");
 const schedule = require("node-schedule");
-const sendEmail = require("../email/emailConfig");
 //const csv = require('csv-parser');
 
 const randomstring = require("randomstring");
@@ -42,9 +36,7 @@ const generateOTP = () => {
   return otp.toString();
 };
 
-alumniRoutes.post(
-  "/register/mobile",
-  validateEmail,
+alumniRoutes.post("/register/mobile",validateEmail,
   validatePassword,
   async (req, res) => {
     const {
@@ -207,10 +199,7 @@ alumniRoutes.post(
   }
 );
 
-alumniRoutes.post(
-  "/register",
-  validateEmail,
-  validatePassword,
+alumniRoutes.post("/register",validateEmail,validatePassword,
   async (req, res) => {
     const {
       firstName,
