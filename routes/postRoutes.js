@@ -15,7 +15,11 @@ const Poll = require("../models/poll");
 const Event = require("../models/Events");
 const mongoose = require('mongoose');
 const Notification = require("../models/notification");
-
+const { 
+  filterProhibitedWords, 
+  filterObjectFields, 
+  checkForProhibitedWords 
+} = require("../utils/prohibitedWordsFilter");
 const postRoutes = express.Router();
 
 const mergeSortAndPaginate = async (page, size) => {
@@ -38,30 +42,7 @@ const mergeSortAndPaginate = async (page, size) => {
   // Combine the records
   let combinedRecords = [...posts, ...jobs, ...polls, ...events];
 
-  // Fetch the latest userName and profilePicture from the Alumni collection for each record
-  // combinedRecords = await Promise.all(
-  //   combinedRecords.map(async (record) => {
-  //     let userName = '';
-  //     let profilePicture = '';
-      
-  //     if (record.userId) {
-  //       const recId = new mongoose.Types.ObjectId(record.userId);
-  //       const alumni = await Alumni.findOne({ _id: recId }, 'firstName lastName profilePicture');
-  //       if (alumni) {
-  //         // console.log('alumni',alumni._id)
-  //         userName = `${alumni.firstName} ${alumni.lastName}`;
-  //         profilePicture = alumni.profilePicture;
-  //       }
-  //     }
-
-  //     // Return the record along with updated userName and profilePicture
-  //     return {
-  //       ...record._doc, // Spreads the post/job/event details
-  //       userName: userName || record.userName, // Updates userName if found, otherwise keeps the existing one
-  //       profilePicture: profilePicture || record.profilePicture, // Updates profilePicture if found
-  //     };
-  //   })
-  // );
+ 
 
   // Sort combined records by createdAt date
   combinedRecords = combinedRecords.sort((a, b) => b.createdAt - a.createdAt);
@@ -154,6 +135,17 @@ postRoutes.post("/create", upload.single("videoPath"), async (req, res) => {
     const folderName= req.query.folder;
     // const alumni = await Alumni.findById(userId);
     //let videoPath = null;
+
+       let filteredDescription = description;
+    if (description && typeof description === 'string') {
+      filteredDescription = await filterProhibitedWords(description);
+      
+      // Optional: Log if prohibited words were found (for admin monitoring)
+      const prohibitedCheck = await checkForProhibitedWords(description);
+      if (prohibitedCheck.containsProhibited) {
+        console.log(`Prohibited words filtered in post by user ${userId}:`, prohibitedCheck.foundWords);
+      }
+    }
  
     if (req.file) {
       console.log('request file present')
@@ -171,7 +163,7 @@ postRoutes.post("/create", upload.single("videoPath"), async (req, res) => {
       // location: alumni.location,
       picturePath,
       profilePicture,       
-      description,
+      description:filteredDescription,
       videoPath,
       groupID,
       likes: [],
@@ -553,13 +545,22 @@ postRoutes.post("/:_id/comments", async (req, res) => {
     const { _id } = req.params;
     const { userId, content, userName, parentCommentId,profilePicture,postUserId } = req.body;
 
-    
+          let filteredDescription = content;
+    if (content && typeof content === 'string') {
+      filteredDescription = await filterProhibitedWords(content);
+      
+      // Optional: Log if prohibited words were found (for admin monitoring)
+      const prohibitedCheck = await checkForProhibitedWords(content);
+      if (prohibitedCheck.containsProhibited) {
+        console.log(`Prohibited words filtered in post by user ${userId}:`, prohibitedCheck.foundWords);
+      }
+    }
     const post = await Post.findById(_id);
     if (!post) {
       return res.status(404).json({ message: "post not found" });
     }
 
-    const newComment = { userId, content, userName,profilePicture,postUserId };
+    const newComment = { userId, content:filteredDescription, userName,profilePicture,postUserId };
 
     
     const findCommentById = (commentId, commentsArray) => {
