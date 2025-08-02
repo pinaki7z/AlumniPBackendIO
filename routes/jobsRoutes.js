@@ -11,6 +11,7 @@ const fs = require("fs");
 const url = require("url");
 const Alumni = require("../models/Alumni");
 const Notification = require("../models/notification");
+const notificationCenter = require("../models/notificationCenter");
 
 const jobRoutes = express.Router();
 
@@ -101,40 +102,18 @@ jobRoutes.post("/create", async (req, res) => {
       });
 
       savedItem = await newJob.save();
-      console.log("Job saved:", savedItem);
+      // console.log("Job saved:", savedItem);
 
+       // ---- CREATE A SINGLE GLOBAL NOTIFICATION ----
+      await notificationCenter.create({
+        global: true,  // mark as global notification
+        type: "job",
+        title: "New Job Posted",
+        message: `${newJob.title} has been posted. Check it out!`,
+        relatedId: newJob._id,
+      });
     } 
-    // else if (type === "Internship") {
-    //   console.log("Creating an internship post");
-    //   const newInternship = new Internship({
-    //     userId,
-    //     title,
-    //     description,
-    //     questions,
-    //     category,
-    //     employmentType,
-    //     duration,
-    //     applyBy,
-    //     currency,
-    //     salaryMin,
-    //     salaryMax,
-    //     attachments,
-    //     location,
-    //     locationType,
-    //     type,
-    //     company,
-    //     coverImage,
-    //     archive: false,
-    //     starred: [],
-    //     approved: false,
-    //     userName,
-    //     profilePicture,
-    //     verified,
-    //   });
-
-    //   savedItem = await newInternship.save();
-    //   console.log("Internship saved:", savedItem);
-    // }
+  
      else {
       console.error("Invalid type:", type);
       return res.status(400).json({ error: "Invalid type. Must be 'Job' or 'Internship'." });

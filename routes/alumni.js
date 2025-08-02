@@ -17,6 +17,7 @@ const multer = require("multer");
 const csv = require("csvtojson");
 
 const Alumni = require("../models/Alumni");
+const UserVerification = require("../models/userVerificationSchema");
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -199,7 +200,7 @@ alumniRoutes.post("/register/mobile",validateEmail,
   }
 );
 
-alumniRoutes.post("/register",validateEmail,validatePassword,
+alumniRoutes.post("/register", validateEmail, validatePassword,
   async (req, res) => {
     const {
       firstName,
@@ -244,25 +245,33 @@ alumniRoutes.post("/register",validateEmail,validatePassword,
     let { otp, status, profileLevel } = req.body;
 
     try {
+      // reCAPTCHA validation (commented out for now)
       // const captchaVerifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${process.env.RECAPTCHA_SECRET}&response=${captchaToken}`;
-
       // const captchaResponse = await axios.post(captchaVerifyUrl);
       // if (!captchaResponse.data.success) {
-      //   return res
-      //     .status(400)
-      //     .json("reCAPTCHA validation failed. Please try again.");
+      //   return res.status(400).json({
+      //     success: false,
+      //     message: "reCAPTCHA validation failed. Please try again."
+      //   });
       // }
-      // Check if the username already exists in the database
+
+      // Check if the email already exists in the database
       const existingAlumni = await Alumni.findOne({ email });
       if (existingAlumni) {
-        return res.status(409).send("Email already registered");
+        return res.status(409).json({
+          success: false,
+          message: "Email already registered",
+          code: "EMAIL_EXISTS"
+        });
       }
 
+      // Hash password and generate OTP
       const encrypted = await bcrypt.hash(password, 10);
       otp = generateOTP();
 
+      // Calculate expiration date
       const currentDate = new Date();
-      let newExpirationDate = null; // Initialize expirationDate variable
+      let newExpirationDate = null;
 
       // Set expirationDate only if admin is not true
       if (!admin) {
@@ -270,8 +279,9 @@ alumniRoutes.post("/register",validateEmail,validatePassword,
         newExpirationDate.setDate(currentDate.getDate() + 7);
       }
 
+      // Determine profile level
       let profileLevelValue;
-      switch (userType.toLowerCase()) {
+      switch (userType?.toLowerCase()) {
         case "admin":
           profileLevelValue = 1;
           break;
@@ -281,12 +291,14 @@ alumniRoutes.post("/register",validateEmail,validatePassword,
         case "student":
           profileLevelValue = 3;
           break;
-        case "specialRole":
+        case "specialrole":
           profileLevelValue = 4;
           break;
         default:
-          profileLevelValue = 3;
+          profileLevelValue = 3; // Default to student
       }
+
+      // Create alumni object
       const newAlumni = new Alumni({
         firstName,
         lastName,
@@ -327,47 +339,165 @@ alumniRoutes.post("/register",validateEmail,validatePassword,
         expirationDate: newExpirationDate,
       });
 
-      await newAlumni.save();
+      // Variables to track what was created
+      let savedAlumni = null;
+      let verificationRecord = null;
+      let emailSent = false;
 
-      if (admin !== undefined) {
-        console.log("admin is not undefined");
-        const transporter = nodemailer.createTransport({
-          host: "smtp.gmail.com",
-          port: 587,
-          auth: {
-            user: "nandannandu254@gmail.com",
-            pass: "hbpl hane patw qzqb",
-          },
-        });
+      try {
+        // Step 1: Save the alumni user
+        savedAlumni = await newAlumni.save();
+        console.log(`✅ New alumni created successfully with ID: ${savedAlumni._id}`);
 
-        let message = {
-          from: "nandannandu254@gmail.com",
-          to: email,
-          subject: "Alumni Portal Login Credentials",
-          text: `Your Alumni Portal Login Credentials are:
-               email : ${email}
-               password : ${password} `,
+        // Step 2: Create UserVerification record
+        try {
+          const newUserVerification = new UserVerification({
+            userId: savedAlumni._id,
+            expirationDate: newExpirationDate,
+            accountDeleted: false,
+            validated: admin ? true : false // Auto-validate admins, others need manual validation
+          });
+
+          verificationRecord = await newUserVerification.save();
+          console.log(`✅ User verification record created for user: ${savedAlumni._id}`);
+        } catch (verificationError) {
+          console.error("❌ Error creating user verification record:", verificationError);
+          // Log the error but don't fail the registration
+          // The user is still created successfully
+        }
+
+        // Step 3: Send email notification if admin is defined
+        // if (admin !== undefined) {
+        //   try {
+        //     console.log("📧 Preparing to send admin credentials email");
+            
+        //     const transporter = nodemailer.createTransporter({
+        //       host: "smtp.gmail.com",
+        //       port: 587,
+        //       secure: false, // true for 465, false for other ports
+        //       auth: {
+        //         user: process.env.EMAIL_USER || "nandannandu254@gmail.com",
+        //         pass: process.env.EMAIL_PASS || "hbpl hane patw qzqb",
+        //       },
+        //     });
+
+        //     const message = {
+        //       from: process.env.EMAIL_USER || "nandannandu254@gmail.com",
+        //       to: email,
+        //       subject: "Alumni Portal Login Credentials",
+        //       html: `
+        //         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        //           <h2 style="color: #0A3A4C;">Welcome to Alumni Portal</h2>
+        //           <p>Dear ${firstName} ${lastName},</p>
+        //           <p>Your Alumni Portal account has been created successfully. Here are your login credentials:</p>
+        //           <div style="background-color: #f5f5f5; padding: 20px; border-radius: 5px; margin: 20px 0;">
+        //             <p><strong>Email:</strong> ${email}</p>
+        //             <p><strong>Password:</strong> ${password}</p>
+        //           </div>
+        //           <p>Please keep these credentials secure and change your password after your first login.</p>
+        //           <p>Best regards,<br>Alumni Portal Team</p>
+        //         </div>
+        //       `,
+        //       text: `Your Alumni Portal Login Credentials are:
+        //              Email: ${email}
+        //              Password: ${password}
+                     
+        //              Please keep these credentials secure and change your password after your first login.`
+        //     };
+
+        //     // Send email (uncomment to enable)
+        //     // const info = await transporter.sendMail(message);
+        //     // console.log(`✅ Email sent successfully: ${info.messageId}`);
+        //     // emailSent = true;
+            
+        //     console.log("📧 Email prepared but not sent (commented out in code)");
+        //   } catch (emailError) {
+        //     console.error("❌ Error sending email:", emailError);
+        //     // Email failure doesn't affect registration success
+        //   }
+        // }
+
+        // Step 4: Return success response
+        const response = {
+          success: true,
+          message: "Alumni registered successfully",
+          data: {
+            userId: savedAlumni._id,
+            email: savedAlumni.email,
+            firstName: savedAlumni.firstName,
+            lastName: savedAlumni.lastName,
+            profileLevel: savedAlumni.profileLevel,
+            userType: userType,
+            verificationCreated: !!verificationRecord,
+            emailSent: emailSent,
+            requiresValidation: !admin
+          }
         };
 
-        // transporter.sendMail(message, (err, info) => {
-        //   if (err) {
-        //     console.log("Error occurred. " + err.message);
-        //     return process.exit(1);
-        //   }
+        console.log(`✅ Registration completed successfully for user: ${email}`);
+        return res.status(201).json(response);
 
-        //   console.log("Message sent: %s", info.messageId);
-        //   // Preview only available when sending through an Ethereal account
-        //   console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
-        // });
+      } catch (saveError) {
+        console.error("❌ Error in save process:", saveError);
+        
+        // If alumni creation failed, return error
+        if (!savedAlumni) {
+          throw new Error(`Failed to create alumni account: ${saveError.message}`);
+        }
+        
+        // If only verification creation failed, log but continue
+        console.log("⚠️ Alumni created successfully, but verification record creation failed");
+        
+        return res.status(201).json({
+          success: true,
+          message: "Alumni registered successfully (with warnings)",
+          data: {
+            userId: savedAlumni._id,
+            email: savedAlumni.email,
+            firstName: savedAlumni.firstName,
+            lastName: savedAlumni.lastName,
+            profileLevel: savedAlumni.profileLevel,
+            userType: userType,
+            verificationCreated: false,
+            emailSent: false,
+            requiresValidation: !admin
+          },
+          warnings: ["Verification record creation failed"]
+        });
       }
 
-      return res.status(201).send("Alumni registered successfully");
     } catch (error) {
-      console.error("Error registering alumni:", error);
-      return res.status(500).send("Internal Server Error", error);
+      console.error("❌ Error registering alumni:", error);
+      
+      // Return detailed error information
+      const errorResponse = {
+        success: false,
+        message: "Registration failed",
+        error: {
+          type: error.name || "UnknownError",
+          message: error.message || "An unexpected error occurred"
+        }
+      };
+
+      // Add more details in development mode
+      if (process.env.NODE_ENV === 'development') {
+        errorResponse.error.stack = error.stack;
+        errorResponse.error.details = error;
+      }
+
+      // Determine appropriate status code
+      let statusCode = 500;
+      if (error.message?.includes("Email already registered")) {
+        statusCode = 409;
+      } else if (error.message?.includes("validation")) {
+        statusCode = 400;
+      }
+
+      return res.status(statusCode).json(errorResponse);
     }
   }
 );
+
 
 alumniRoutes.post("/login/mobile", async (req, res) => {
   const { email, password} = req.body;
@@ -591,6 +721,7 @@ alumniRoutes.put("/:alumniId", verifyToken, async (req, res) => {
     Object.assign(alumni, updatedData);
 
     await alumni.save();
+    
     if (workingAt) {
       try {
         const existingCompany = await Company.findOne({ name: workingAt });
@@ -603,33 +734,67 @@ alumniRoutes.put("/:alumniId", verifyToken, async (req, res) => {
         console.error("Error adding new company:", error);
       }
     }
-    console.log("idUpdated", idUpdated)
 
-    if (ID && idUpdated ) {
-      const admin = await Alumni.findOne({
-        profileLevel: 1,
-        department: alumni.department,
-      });
+    console.log("idUpdated", idUpdated);
 
-      const superAdmin = await Alumni.findOne({
-        profileLevel: 0,
-      });
+    if (ID && idUpdated) {
+      try {
+        // Update or create UserVerification record
+        let userVerification = await UserVerification.findOne({ userId: alumniId });
+        
+        if (!userVerification) {
+          // Create new verification record if doesn't exist
+          userVerification = new UserVerification({
+            userId: alumniId,
+            validated: false,
+            accountDeleted: false,
+            expirationDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days from now
+          });
+        }
 
-      const recipient = admin || superAdmin;
+        // Update ID-related fields
+        userVerification.ID = ID;
+        userVerification.idUpdated = true;
+        userVerification.idUploadedAt = new Date();
+        userVerification.idApprovalStatus = 'pending';
+        userVerification.idApprovedBy = null;
+        userVerification.idApprovedAt = null;
+        userVerification.idRejectionReason = null;
 
-      if (recipient) {
-        const userName = `${alumni.firstName} ${alumni.lastName}`;
-        const newNotification = new Notification({
-          userId: alumni._id,
-          requestedUserName: userName,
-          ownerId: recipient._id,
-          ID: ID,
-          status: false,
+        await userVerification.save();
+        console.log(`✅ UserVerification record updated for user: ${alumniId}`);
+
+        // Create notification for admin
+        const admin = await Alumni.findOne({
+          profileLevel: 1,
+          department: alumni.department,
         });
 
-        await newNotification.save();
-      } else {
-        console.error("Admin not found for the department");
+        const superAdmin = await Alumni.findOne({
+          profileLevel: 0,
+        });
+
+        const recipient = admin || superAdmin;
+
+        if (recipient) {
+          const userName = `${alumni.firstName} ${alumni.lastName}`;
+          const newNotification = new Notification({
+            userId: alumni._id,
+            requestedUserName: userName,
+            ownerId: recipient._id,
+            ID: ID,
+            status: false,
+          });
+
+          await newNotification.save();
+          console.log(`✅ Notification created for admin: ${recipient._id}`);
+        } else {
+          console.error("Admin not found for the department");
+        }
+
+      } catch (verificationError) {
+        console.error("Error updating user verification:", verificationError);
+        // Don't fail the main update if verification update fails
       }
     }
 
@@ -1205,6 +1370,7 @@ alumniRoutes.delete("/alumni/deleteNotification", async (req, res) => {
   }
 });
 
+// Updated bulk registration route with UserVerification integration
 alumniRoutes.post(
   "/alumni/bulkRegister",
   upload.single("csv"),
@@ -1212,12 +1378,21 @@ alumniRoutes.post(
     try {
       const alumniData = [];
       if (!req.file) {
-        return res.status(400).json({ error: "No CSV file uploaded" });
+        return res.status(400).json({ 
+          success: false,
+          error: "No CSV file uploaded" 
+        });
       }
+
+      console.log(`📁 Processing CSV file: ${req.file.originalname}`);
+      
       csv()
         .fromFile(req.file.path)
         .then(async (response) => {
           let mandatoryFieldsMissing = false;
+          const errors = [];
+
+          // Validate CSV data
           response.forEach((row, index) => {
             if (
               !row["firstName*"] ||
@@ -1227,34 +1402,38 @@ alumniRoutes.post(
               !row["department*"] ||
               !row["batch*"]
             ) {
-              console.log(
-                `Mandatory fields are missing in row ${
-                  index + 1
-                } of the CSV file`
-              );
+              console.log(`❌ Mandatory fields missing in row ${index + 1}`);
+              errors.push(`Row ${index + 1}: Mandatory fields missing`);
               mandatoryFieldsMissing = true;
             }
           });
+
           if (mandatoryFieldsMissing) {
-            return res
-              .status(400)
-              .json({ error: "Mandatory fields are missing in the CSV file" });
+            return res.status(400).json({ 
+              success: false,
+              error: "Mandatory fields are missing in the CSV file",
+              details: errors
+            });
           }
 
+          // Process CSV data
           for (let i = 0; i < response.length; i++) {
             const existingAlumni = await Alumni.findOne({
               email: response[i]["email*"],
             });
+            
             if (existingAlumni) {
-              console.log(
-                `Skipping alumni with email ${response[i]["email*"]} as it already exists.`
-              );
+              console.log(`⚠️ Skipping alumni with email ${response[i]["email*"]} - already exists`);
               continue;
             }
+
             const password = randomstring.generate({
               length: 10,
               charset: "alphanumeric",
             });
+
+            const hashedPassword = await bcrypt.hash(password, 10);
+
             alumniData.push({
               firstName: response[i]["firstName*"],
               lastName: response[i]["lastName*"],
@@ -1265,51 +1444,153 @@ alumniRoutes.post(
               mobile: response[i].mobile || "",
               workingAt: response[i].workingAt || "",
               address: response[i].address || "",
-              password: password,
+              password: hashedPassword,
+              originalPassword: password, // Keep original for email
               validated: true,
+              profileLevel: 2, // Default to alumni
+              accountDeleted: false,
+              expirationDate: null // Bulk imported users don't expire
             });
           }
-          // console.log("alumniData", alumniData);
+
+          console.log(`📊 Processed ${alumniData.length} valid records from CSV`);
+
           if (alumniData.length > 0) {
-            await Alumni.insertMany(alumniData);
+            try {
+              // Step 1: Insert alumni records
+              const insertedAlumni = await Alumni.insertMany(alumniData);
+              console.log(`✅ ${insertedAlumni.length} alumni records created successfully`);
 
-            const transporter = nodemailer.createTransport({
-              host: "smtp.gmail.com",
-              port: 587,
-              auth: {
-                user: "nandannandu254@gmail.com",
-                pass: "hbpl hane patw qzqb",
-              },
-            });
+              // Step 2: Create verification records for all inserted alumni
+              const verificationData = insertedAlumni.map(alumni => ({
+                userId: alumni._id,
+                expirationDate: null, // Bulk imported users don't expire
+                accountDeleted: false,
+                validated: true // Auto-validate bulk imported users
+              }));
 
-            alumniData.forEach((alumni) => {
-              const { email, password } = alumni;
-              const message = {
-                from: "nandannandu254@gmail.com",
-                to: email,
-                subject: "Alumni Portal Login Credentials",
-                text: `Your Alumni Portal Login Credentials are:
-                       email: ${email}
-                       password: ${password}`,
+              let verificationRecordsCreated = 0;
+              try {
+                const insertedVerifications = await UserVerification.insertMany(verificationData);
+                verificationRecordsCreated = insertedVerifications.length;
+                console.log(`✅ ${verificationRecordsCreated} user verification records created`);
+              } catch (verificationError) {
+                console.error("❌ Error creating bulk verification records:", verificationError);
+                // Continue with email sending even if verification creation fails
+              }
+
+              // Step 3: Send emails
+              let emailsSent = 0;
+              try {
+                const transporter = nodemailer.createTransporter({
+                  host: "smtp.gmail.com",
+                  port: 587,
+                  secure: false,
+                  auth: {
+                    user: process.env.EMAIL_USER || "nandannandu254@gmail.com",
+                    pass: process.env.EMAIL_PASS || "hbpl hane patw qzqb",
+                  },
+                });
+
+                const emailPromises = insertedAlumni.map(async (alumni) => {
+                  // Find original data to get password
+                  const originalData = alumniData.find(data => data.email === alumni.email);
+                  if (originalData) {
+                    const { email, originalPassword } = originalData;
+                    const message = {
+                      from: process.env.EMAIL_USER || "nandannandu254@gmail.com",
+                      to: email,
+                      subject: "Alumni Portal Login Credentials",
+                      html: `
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                          <h2 style="color: #0A3A4C;">Welcome to Alumni Portal</h2>
+                          <p>Dear ${alumni.firstName} ${alumni.lastName},</p>
+                          <p>Your Alumni Portal account has been created successfully. Here are your login credentials:</p>
+                          <div style="background-color: #f5f5f5; padding: 20px; border-radius: 5px; margin: 20px 0;">
+                            <p><strong>Email:</strong> ${email}</p>
+                            <p><strong>Password:</strong> ${originalPassword}</p>
+                          </div>
+                          <p>Please keep these credentials secure and change your password after your first login.</p>
+                          <p>Best regards,<br>Alumni Portal Team</p>
+                        </div>
+                      `,
+                      text: `Your Alumni Portal Login Credentials are:
+                             Email: ${email}
+                             Password: ${originalPassword}
+                             
+                             Please keep these credentials secure and change your password after your first login.`
+                    };
+
+                    try {
+                      // Uncomment to enable email sending
+                      // const info = await transporter.sendMail(message);
+                      // console.log(`✅ Email sent to ${email}: ${info.messageId}`);
+                      emailsSent++;
+                      return { email, status: 'sent' };
+                    } catch (emailError) {
+                      console.error(`❌ Error sending email to ${email}:`, emailError.message);
+                      return { email, status: 'failed', error: emailError.message };
+                    }
+                  }
+                  return { email: alumni.email, status: 'skipped', reason: 'Original data not found' };
+                });
+
+                // Wait for all emails to be processed
+                const emailResults = await Promise.allSettled(emailPromises);
+                console.log(`📧 Email processing completed. ${emailsSent} emails prepared`);
+                
+              } catch (emailError) {
+                console.error("❌ Error in bulk email sending:", emailError);
+              }
+
+              // Step 4: Return success response
+              const response = {
+                success: true,
+                message: "CSV imported successfully",
+                data: {
+                  totalProcessed: response.length,
+                  alumniCreated: insertedAlumni.length,
+                  verificationRecordsCreated: verificationRecordsCreated,
+                  emailsSent: emailsSent,
+                  skipped: response.length - alumniData.length
+                }
               };
 
-              transporter.sendMail(message, (err, info) => {
-                if (err) {
-                  console.log("Error occurred. " + err.message);
-                } else {
-                  console.log("Message sent: %s", info.messageId);
-                  console.log(
-                    "Preview URL: %s",
-                    nodemailer.getTestMessageUrl(info)
-                  );
-                }
+              console.log(`✅ Bulk registration completed successfully`);
+              return res.status(200).json(response);
+
+            } catch (insertError) {
+              console.error("❌ Error inserting alumni records:", insertError);
+              return res.status(500).json({
+                success: false,
+                error: "Failed to insert alumni records",
+                details: insertError.message
               });
+            }
+          } else {
+            return res.status(400).json({
+              success: false,
+              message: "No valid records found to import",
+              details: "All records were either invalid or already exist"
             });
           }
-          res.send({ status: 200, success: true, msg: "CSV imported" });
+        })
+        .catch(csvError => {
+          console.error("❌ Error parsing CSV file:", csvError);
+          return res.status(400).json({
+            success: false,
+            error: "Failed to parse CSV file",
+            details: csvError.message
+          });
         });
+
     } catch (error) {
-      res.send({ status: 400, success: false, msg: err.message });
+      console.error("❌ Error in bulk registration:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Internal server error during bulk registration",
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
   }
 );
