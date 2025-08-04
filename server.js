@@ -1,6 +1,6 @@
 const express = require("express");
 const http = require("http");
-const { Server } = require("socket.io");
+const { initializeSocket } = require("./utils/socket");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const dotenv = require("dotenv");
@@ -53,23 +53,6 @@ const app = express();
 const apiPort = 5000;
 
 const server = http.createServer(app); // Create an HTTP server
-const io = new Server(server, {
-  cors: {
-    origin: [
-      "http://localhost:3000",
-      "http://localhost:3001",
-      "https://alumni-frontend-4ca1.vercel.app",
-      "https://alumni-p-eps.vercel.app",
-      "https://api.excelpublicschool.com",
-      "https://alumni.excelpublicschool.com",
-      "https://alumnify.in",
-      'capacitor://localhost'
-    ],
-    credentials: true,
-  },
-  transports: ["polling"]  
-
-});
 
 const alumniRoutes = require("./routes/alumni");
 const { clearTimeout } = require("timers");
@@ -77,6 +60,8 @@ const uploadRoutes = require("./routes/upload");
 
 app.use(bodyParser.urlencoded({ extended: true, limit: "100mb" }));
 app.use(bodyParser.json({ extended: true, limit: "100mb" }));
+
+const io = initializeSocket(server);
 
 const corsOptions = {
   origin: true,
@@ -164,96 +149,6 @@ const secretKey =
 const onlineUserIds = new Set();
 let onlinePeople = 0;
 
-// Socket.IO auth middleware
-io.use((socket, next) => {
-  const token = socket.handshake.auth?.token;
-  // console.log("🔒 Received token:", token);
-
-  if (!token) {
-    console.error("🔒 Auth error: no token provided");
-    return next(new Error("Auth error"));
-  }
-
-  // Decode WITHOUT verifying signature
-  const payload = jwt.decode(token, { complete: false });
-  if (!payload || typeof payload !== "object") {
-    console.error("🔒 Auth error: invalid token format");
-    return next(new Error("Auth error"));
-  }
-
-  // Extract userId
-  socket.userId = payload.userId;
-  // console.log("🛠️  Decoded userId (no verify):", socket.userId);
-
-  // Proceed without signature check
-  next();
-});
-// Socket.IO connection
-io.on("connection", socket => {
-  // 1) Log the connection
-  console.log(`User connected: ${socket.userId}`);
-  // 2) Catch any uncaught exceptions in this block
-  try {
-    socket.join(socket.userId);
-
-    // emit updated online list
-    const emitOnline = () => {
-      const online = Array.from(io.sockets.sockets.values())
-        .map(s => s.userId);
-      io.emit("online-users", online);
-      // console.log('online', online)
-    };
-    emitOnline();
-
-    // 3) Wrap your async handler in try/catch
-    socket.on("send-message", async ({ recipient, text, file }) => {
-      try {
-        // console.log('hi')
-        const Message = require("./models/message");
-        const msg = await Message.create({
-          sender:    socket.userId,
-          recipient,
-          text,
-          file: file?.filename || null
-        });
-        io.to(recipient).emit("receive-message", {
-          _id:        msg._id,
-          sender:     socket.userId,
-          recipient,
-          text:       msg.text,
-          file:       msg.file,
-          createdAt:  msg.createdAt
-        });
-        io.to(socket.userId).emit("receive-message", {
-          _id:        msg._id,
-          sender:     socket.userId,
-          recipient,
-          text:       msg.text,
-          file:       msg.file,
-          createdAt:  msg.createdAt
-        });
-      } catch (err) {
-        console.error("Error in send-message handler:", err);
-        // optionally notify the client:
-        socket.emit("error", { message: "Message send failed." });
-      }
-    });
-
-    socket.on("disconnect", () => {
-      console.log(`User disconnected: ${socket.userId}`);
-      emitOnline();
-    });
-
-    // 4) Listen for any socket‑level errors
-    socket.on("error", err => {
-      console.error("Socket error for user", socket.userId, err);
-    });
-
-  } catch (err) {
-    // catches sync errors in the connection handler
-    console.error("Error in connection handler for user", socket.userId, err);
-  }
-});
 
 server.listen(apiPort, () => {
   console.log(`Server running on port ${apiPort}`);
