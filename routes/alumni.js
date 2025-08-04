@@ -11,11 +11,11 @@ const Notification = require("../models/notification");
 const Company = require("../models/company");
 const schedule = require("node-schedule");
 //const csv = require('csv-parser');
-
+const { createVerificationWarning } = require('../utils/notificationHelpers');
 const randomstring = require("randomstring");
 const multer = require("multer");
 const csv = require("csvtojson");
-
+const { createAdminIdNotifications } = require('../utils/notificationHelpers');
 const Alumni = require("../models/Alumni");
 const UserVerification = require("../models/userVerificationSchema");
 
@@ -37,7 +37,7 @@ const generateOTP = () => {
   return otp.toString();
 };
 
-alumniRoutes.post("/register/mobile",validateEmail,
+alumniRoutes.post("/register/mobile", validateEmail,
   validatePassword,
   async (req, res) => {
     const {
@@ -111,12 +111,12 @@ alumniRoutes.post("/register/mobile",validateEmail,
       const profileLevelValue = admin
         ? 1
         : alumni
-        ? 2
-        : student
-        ? 3
-        : specialRole
-        ? 4
-        : null;
+          ? 2
+          : student
+            ? 3
+            : specialRole
+              ? 4
+              : null;
 
       const newAlumni = new Alumni({
         firstName,
@@ -359,148 +359,160 @@ alumniRoutes.post("/register", validateEmail, validatePassword,
           });
 
           verificationRecord = await newUserVerification.save();
-          console.log(`✅ User verification record created for user: ${savedAlumni._id}`);
-        } catch (verificationError) {
-          console.error("❌ Error creating user verification record:", verificationError);
-          // Log the error but don't fail the registration
-          // The user is still created successfully
+
+          // UserVerification record
+          if (!admin && savedAlumni && newExpirationDate) {
+            // Create warning notification for non-admin users
+            try {
+              await createVerificationWarning(savedAlumni._id, newExpirationDate);
+              console.log(`✅ Verification warning notification created for user: ${savedAlumni._id}`);
+            } catch (notificationError) {
+              console.error("Error creating verification warning notification:", notificationError);
+            }
+          }
+
+            console.log(`✅ User verification record created for user: ${savedAlumni._id}`);
+          } catch (verificationError) {
+            console.error("❌ Error creating user verification record:", verificationError);
+            // Log the error but don't fail the registration
+            // The user is still created successfully
+          }
+
+          // Step 3: Send email notification if admin is defined
+          // if (admin !== undefined) {
+          //   try {
+          //     console.log("📧 Preparing to send admin credentials email");
+
+          //     const transporter = nodemailer.createTransporter({
+          //       host: "smtp.gmail.com",
+          //       port: 587,
+          //       secure: false, // true for 465, false for other ports
+          //       auth: {
+          //         user: process.env.EMAIL_USER || "nandannandu254@gmail.com",
+          //         pass: process.env.EMAIL_PASS || "hbpl hane patw qzqb",
+          //       },
+          //     });
+
+          //     const message = {
+          //       from: process.env.EMAIL_USER || "nandannandu254@gmail.com",
+          //       to: email,
+          //       subject: "Alumni Portal Login Credentials",
+          //       html: `
+          //         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          //           <h2 style="color: #0A3A4C;">Welcome to Alumni Portal</h2>
+          //           <p>Dear ${firstName} ${lastName},</p>
+          //           <p>Your Alumni Portal account has been created successfully. Here are your login credentials:</p>
+          //           <div style="background-color: #f5f5f5; padding: 20px; border-radius: 5px; margin: 20px 0;">
+          //             <p><strong>Email:</strong> ${email}</p>
+          //             <p><strong>Password:</strong> ${password}</p>
+          //           </div>
+          //           <p>Please keep these credentials secure and change your password after your first login.</p>
+          //           <p>Best regards,<br>Alumni Portal Team</p>
+          //         </div>
+          //       `,
+          //       text: `Your Alumni Portal Login Credentials are:
+          //              Email: ${email}
+          //              Password: ${password}
+
+          //              Please keep these credentials secure and change your password after your first login.`
+          //     };
+
+          //     // Send email (uncomment to enable)
+          //     // const info = await transporter.sendMail(message);
+          //     // console.log(`✅ Email sent successfully: ${info.messageId}`);
+          //     // emailSent = true;
+
+          //     console.log("📧 Email prepared but not sent (commented out in code)");
+          //   } catch (emailError) {
+          //     console.error("❌ Error sending email:", emailError);
+          //     // Email failure doesn't affect registration success
+          //   }
+          // }
+
+          // Step 4: Return success response
+          const response = {
+            success: true,
+            message: "Alumni registered successfully",
+            data: {
+              userId: savedAlumni._id,
+              email: savedAlumni.email,
+              firstName: savedAlumni.firstName,
+              lastName: savedAlumni.lastName,
+              profileLevel: savedAlumni.profileLevel,
+              userType: userType,
+              verificationCreated: !!verificationRecord,
+              emailSent: emailSent,
+              requiresValidation: !admin
+            }
+          };
+
+          console.log(`✅ Registration completed successfully for user: ${email}`);
+          return res.status(201).json(response);
+
+        } catch (saveError) {
+          console.error("❌ Error in save process:", saveError);
+
+          // If alumni creation failed, return error
+          if (!savedAlumni) {
+            throw new Error(`Failed to create alumni account: ${saveError.message}`);
+          }
+
+          // If only verification creation failed, log but continue
+          console.log("⚠️ Alumni created successfully, but verification record creation failed");
+
+          return res.status(201).json({
+            success: true,
+            message: "Alumni registered successfully (with warnings)",
+            data: {
+              userId: savedAlumni._id,
+              email: savedAlumni.email,
+              firstName: savedAlumni.firstName,
+              lastName: savedAlumni.lastName,
+              profileLevel: savedAlumni.profileLevel,
+              userType: userType,
+              verificationCreated: false,
+              emailSent: false,
+              requiresValidation: !admin
+            },
+            warnings: ["Verification record creation failed"]
+          });
         }
 
-        // Step 3: Send email notification if admin is defined
-        // if (admin !== undefined) {
-        //   try {
-        //     console.log("📧 Preparing to send admin credentials email");
-            
-        //     const transporter = nodemailer.createTransporter({
-        //       host: "smtp.gmail.com",
-        //       port: 587,
-        //       secure: false, // true for 465, false for other ports
-        //       auth: {
-        //         user: process.env.EMAIL_USER || "nandannandu254@gmail.com",
-        //         pass: process.env.EMAIL_PASS || "hbpl hane patw qzqb",
-        //       },
-        //     });
+      } catch (error) {
+        console.error("❌ Error registering alumni:", error);
 
-        //     const message = {
-        //       from: process.env.EMAIL_USER || "nandannandu254@gmail.com",
-        //       to: email,
-        //       subject: "Alumni Portal Login Credentials",
-        //       html: `
-        //         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        //           <h2 style="color: #0A3A4C;">Welcome to Alumni Portal</h2>
-        //           <p>Dear ${firstName} ${lastName},</p>
-        //           <p>Your Alumni Portal account has been created successfully. Here are your login credentials:</p>
-        //           <div style="background-color: #f5f5f5; padding: 20px; border-radius: 5px; margin: 20px 0;">
-        //             <p><strong>Email:</strong> ${email}</p>
-        //             <p><strong>Password:</strong> ${password}</p>
-        //           </div>
-        //           <p>Please keep these credentials secure and change your password after your first login.</p>
-        //           <p>Best regards,<br>Alumni Portal Team</p>
-        //         </div>
-        //       `,
-        //       text: `Your Alumni Portal Login Credentials are:
-        //              Email: ${email}
-        //              Password: ${password}
-                     
-        //              Please keep these credentials secure and change your password after your first login.`
-        //     };
-
-        //     // Send email (uncomment to enable)
-        //     // const info = await transporter.sendMail(message);
-        //     // console.log(`✅ Email sent successfully: ${info.messageId}`);
-        //     // emailSent = true;
-            
-        //     console.log("📧 Email prepared but not sent (commented out in code)");
-        //   } catch (emailError) {
-        //     console.error("❌ Error sending email:", emailError);
-        //     // Email failure doesn't affect registration success
-        //   }
-        // }
-
-        // Step 4: Return success response
-        const response = {
-          success: true,
-          message: "Alumni registered successfully",
-          data: {
-            userId: savedAlumni._id,
-            email: savedAlumni.email,
-            firstName: savedAlumni.firstName,
-            lastName: savedAlumni.lastName,
-            profileLevel: savedAlumni.profileLevel,
-            userType: userType,
-            verificationCreated: !!verificationRecord,
-            emailSent: emailSent,
-            requiresValidation: !admin
+        // Return detailed error information
+        const errorResponse = {
+          success: false,
+          message: "Registration failed",
+          error: {
+            type: error.name || "UnknownError",
+            message: error.message || "An unexpected error occurred"
           }
         };
 
-        console.log(`✅ Registration completed successfully for user: ${email}`);
-        return res.status(201).json(response);
-
-      } catch (saveError) {
-        console.error("❌ Error in save process:", saveError);
-        
-        // If alumni creation failed, return error
-        if (!savedAlumni) {
-          throw new Error(`Failed to create alumni account: ${saveError.message}`);
+        // Add more details in development mode
+        if (process.env.NODE_ENV === 'development') {
+          errorResponse.error.stack = error.stack;
+          errorResponse.error.details = error;
         }
-        
-        // If only verification creation failed, log but continue
-        console.log("⚠️ Alumni created successfully, but verification record creation failed");
-        
-        return res.status(201).json({
-          success: true,
-          message: "Alumni registered successfully (with warnings)",
-          data: {
-            userId: savedAlumni._id,
-            email: savedAlumni.email,
-            firstName: savedAlumni.firstName,
-            lastName: savedAlumni.lastName,
-            profileLevel: savedAlumni.profileLevel,
-            userType: userType,
-            verificationCreated: false,
-            emailSent: false,
-            requiresValidation: !admin
-          },
-          warnings: ["Verification record creation failed"]
-        });
-      }
 
-    } catch (error) {
-      console.error("❌ Error registering alumni:", error);
-      
-      // Return detailed error information
-      const errorResponse = {
-        success: false,
-        message: "Registration failed",
-        error: {
-          type: error.name || "UnknownError",
-          message: error.message || "An unexpected error occurred"
+        // Determine appropriate status code
+        let statusCode = 500;
+        if (error.message?.includes("Email already registered")) {
+          statusCode = 409;
+        } else if (error.message?.includes("validation")) {
+          statusCode = 400;
         }
-      };
 
-      // Add more details in development mode
-      if (process.env.NODE_ENV === 'development') {
-        errorResponse.error.stack = error.stack;
-        errorResponse.error.details = error;
+        return res.status(statusCode).json(errorResponse);
       }
-
-      // Determine appropriate status code
-      let statusCode = 500;
-      if (error.message?.includes("Email already registered")) {
-        statusCode = 409;
-      } else if (error.message?.includes("validation")) {
-        statusCode = 400;
-      }
-
-      return res.status(statusCode).json(errorResponse);
     }
-  }
 );
 
 
 alumniRoutes.post("/login/mobile", async (req, res) => {
-  const { email, password} = req.body;
+  const { email, password } = req.body;
 
   try {
     // const captchaVerifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${process.env.RECAPTCHA_SECRET}&response=${captchaToken}`;
@@ -583,11 +595,11 @@ alumniRoutes.post("/login", async (req, res) => {
     if (!alumni) {
       return res.status(404).json("Alumni not found");
     }
-if (alumni.accountDeleted === true) {
+    if (alumni.accountDeleted === true) {
       return res
         .status(404)
         .json("Account has been Deleted. Contact Admin to recover");
-    } 
+    }
 
     // if (alumni.accountDeleted === true && alumni.validated !== false) {
     //   return res
@@ -721,7 +733,7 @@ alumniRoutes.put("/:alumniId", verifyToken, async (req, res) => {
     Object.assign(alumni, updatedData);
 
     await alumni.save();
-    
+
     if (workingAt) {
       try {
         const existingCompany = await Company.findOne({ name: workingAt });
@@ -741,7 +753,7 @@ alumniRoutes.put("/:alumniId", verifyToken, async (req, res) => {
       try {
         // Update or create UserVerification record
         let userVerification = await UserVerification.findOne({ userId: alumniId });
-        
+
         if (!userVerification) {
           // Create new verification record if doesn't exist
           userVerification = new UserVerification({
@@ -787,6 +799,17 @@ alumniRoutes.put("/:alumniId", verifyToken, async (req, res) => {
           });
 
           await newNotification.save();
+
+
+          // Create admin notifications for new ID submission
+          const success = await createAdminIdNotifications(
+            alumniId,
+            `${alumni.firstName} ${alumni.lastName}`
+          );
+
+          if (success) {
+            console.log(`✅ Admin notifications created for ID submission by user: ${alumniId}`);
+          }
           console.log(`✅ Notification created for admin: ${recipient._id}`);
         } else {
           console.error("Admin not found for the department");
@@ -1378,14 +1401,14 @@ alumniRoutes.post(
     try {
       const alumniData = [];
       if (!req.file) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           success: false,
-          error: "No CSV file uploaded" 
+          error: "No CSV file uploaded"
         });
       }
 
       console.log(`📁 Processing CSV file: ${req.file.originalname}`);
-      
+
       csv()
         .fromFile(req.file.path)
         .then(async (response) => {
@@ -1409,7 +1432,7 @@ alumniRoutes.post(
           });
 
           if (mandatoryFieldsMissing) {
-            return res.status(400).json({ 
+            return res.status(400).json({
               success: false,
               error: "Mandatory fields are missing in the CSV file",
               details: errors
@@ -1421,7 +1444,7 @@ alumniRoutes.post(
             const existingAlumni = await Alumni.findOne({
               email: response[i]["email*"],
             });
-            
+
             if (existingAlumni) {
               console.log(`⚠️ Skipping alumni with email ${response[i]["email*"]} - already exists`);
               continue;
@@ -1538,7 +1561,7 @@ alumniRoutes.post(
                 // Wait for all emails to be processed
                 const emailResults = await Promise.allSettled(emailPromises);
                 console.log(`📧 Email processing completed. ${emailsSent} emails prepared`);
-                
+
               } catch (emailError) {
                 console.error("❌ Error in bulk email sending:", emailError);
               }
@@ -1653,17 +1676,18 @@ alumniRoutes.get("/validate/user", async (req, res) => {
       { $match: { profileLevel: { $ne: 0 } } },
 
       // 3) project only the fields you need, and compute `status` + `type`  
-      { $project: {
-          firstName:       1,
-          lastName:        1,
-          profilePicture:  1,
-          email:           1,
-          ID:              1,
+      {
+        $project: {
+          firstName: 1,
+          lastName: 1,
+          profilePicture: 1,
+          email: 1,
+          ID: 1,
           // compute status
           status: {
             $switch: {
               branches: [
-                { 
+                {
                   case: { $eq: ["$accountDeleted", true] },
                   then: "account-deleted"
                 },
@@ -1689,14 +1713,15 @@ alumniRoutes.get("/validate/user", async (req, res) => {
           type: {
             $switch: {
               branches: [
-                { case: { $eq: ["$profileLevel", 1] }, then: "admin"       },
-                { case: { $eq: ["$profileLevel", 2] }, then: "alumni"      },
-                { case: { $eq: ["$profileLevel", 3] }, then: "student"     }
+                { case: { $eq: ["$profileLevel", 1] }, then: "admin" },
+                { case: { $eq: ["$profileLevel", 2] }, then: "alumni" },
+                { case: { $eq: ["$profileLevel", 3] }, then: "student" }
               ],
               default: "student"
             }
           }
-      }}
+        }
+      }
     ]).exec();
 
     res.send({ records, count: records.length });
@@ -1718,9 +1743,9 @@ alumniRoutes.put("/alumni/:id/validateAlumni", async (req, res) => {
     if (validated === true) {
       // Update alumni's accountDeleted and expirationDate
       await Alumni.findByIdAndUpdate(userId, {
-        $set: {  validated: false, ID:"", expirationDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
+        $set: { validated: false, ID: "", expirationDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
       });
-      
+
       return res.status(200).send("Change Validatity stautus successfully.");
     } else {
       await Alumni.findOneAndUpdate(
@@ -1762,7 +1787,7 @@ alumniRoutes.put("/alumni/:id/deleteAccount", async (req, res) => {
           expirationDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days from now
         },
       });
-      
+
       return res.status(200).send("Change Validatity stautus successfully.");
     } else {
       await Alumni.findOneAndUpdate(

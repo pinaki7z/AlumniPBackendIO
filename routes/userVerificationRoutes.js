@@ -3,6 +3,11 @@ const userVerificationRoutes = express.Router();
 const verifyToken = require("../utils");
 const UserVerification = require("../models/userVerificationSchema");
 const Alumni = require("../models/Alumni");
+const { 
+  createVerificationStatusNotification, 
+  removeVerificationWarning 
+} = require('../utils/notificationHelpers');
+
 
 // Create user verification record
 userVerificationRoutes.post("/create",  async (req, res) => {
@@ -301,12 +306,13 @@ userVerificationRoutes.get("/pending-ids", async (req, res) => {
 });
 
 // Approve ID
-userVerificationRoutes.put("/:id/approve-id",  async (req, res) => {
+// Update the approve ID route
+userVerificationRoutes.put("/:id/approve-id", async (req, res) => {
   const { id } = req.params;
-  const adminId = req.body.adminId; // From verifyToken middleware
+  const adminId = req.body.adminId;
 
   try {
-    const verification = await UserVerification.findById(id);
+    const verification = await UserVerification.findById(id).populate('userId');
     
     if (!verification) {
       return res.status(404).json({ message: "User verification record not found" });
@@ -316,14 +322,28 @@ userVerificationRoutes.put("/:id/approve-id",  async (req, res) => {
       return res.status(400).json({ message: "ID is not in pending status" });
     }
 
+    // Get admin info
+    const admin = await Alumni.findById(adminId);
+
     // Update verification record
     verification.idApprovalStatus = 'approved';
     verification.idApprovedBy = adminId;
     verification.idApprovedAt = new Date();
-    verification.validated = true; // Auto-validate when ID is approved
-    verification.expirationDate = null; // Remove expiration when approved
+    verification.validated = true;
+    verification.expirationDate = null;
 
     await verification.save();
+
+    // Create notification for user
+    await createVerificationStatusNotification(
+      verification.userId._id,
+      'approved',
+      null,
+      `${admin.firstName} ${admin.lastName}`
+    );
+
+    // Remove warning notification if exists
+    await removeVerificationWarning(verification.userId._id);
 
     res.status(200).json({
       message: "ID approved successfully",
@@ -335,14 +355,15 @@ userVerificationRoutes.put("/:id/approve-id",  async (req, res) => {
   }
 });
 
-// Reject ID
-userVerificationRoutes.put("/:id/reject-id",  async (req, res) => {
+
+// Update the reject ID route
+userVerificationRoutes.put("/:id/reject-id", async (req, res) => {
   const { id } = req.params;
   const { reason } = req.body;
-  const adminId = req.user.userId;
+  const adminId = req.body.adminId;
 
   try {
-    const verification = await UserVerification.findById(id);
+    const verification = await UserVerification.findById(id).populate('userId');
     
     if (!verification) {
       return res.status(404).json({ message: "User verification record not found" });
@@ -351,6 +372,9 @@ userVerificationRoutes.put("/:id/reject-id",  async (req, res) => {
     if (verification.idApprovalStatus !== 'pending') {
       return res.status(400).json({ message: "ID is not in pending status" });
     }
+
+    // Get admin info
+    const admin = await Alumni.findById(adminId);
 
     // Update verification record
     verification.idApprovalStatus = 'rejected';
@@ -361,6 +385,14 @@ userVerificationRoutes.put("/:id/reject-id",  async (req, res) => {
 
     await verification.save();
 
+    // Create notification for user
+    await createVerificationStatusNotification(
+      verification.userId._id,
+      'rejected',
+      reason,
+      `${admin.firstName} ${admin.lastName}`
+    );
+
     res.status(200).json({
       message: "ID rejected successfully",
       verification
@@ -370,6 +402,7 @@ userVerificationRoutes.put("/:id/reject-id",  async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 });
+
 
 // Get ID approval statistics
 userVerificationRoutes.get("/id-stats", async (req, res) => {
