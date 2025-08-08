@@ -520,4 +520,134 @@ router.get('/stats/:postId', async (req, res) => {
   }
 });
 
+
+// Add like/unlike comment functionality
+router.post('/:commentId/like', async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const { userId, reaction = 'like' } = req.body;
+
+    if (!isValidObjectId(commentId) || !isValidObjectId(userId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid commentId or userId' 
+      });
+    }
+
+    const comment = await Comment.findById(commentId);
+    if (!comment) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Comment not found' 
+      });
+    }
+
+    // Check if user already liked
+    const existingLikeIndex = comment.likes.findIndex(
+      like => like.userId.toString() === userId
+    );
+
+    if (existingLikeIndex > -1) {
+      // Remove like
+      comment.likes.splice(existingLikeIndex, 1);
+      comment.likeCount = Math.max(0, comment.likeCount - 1);
+    } else {
+      // Add like
+      comment.likes.push({ userId, reaction });
+      comment.likeCount += 1;
+    }
+
+    await comment.save();
+
+    res.status(200).json({
+      success: true,
+      message: existingLikeIndex > -1 ? 'Like removed' : 'Like added',
+      data: {
+        isLiked: existingLikeIndex === -1,
+        likeCount: comment.likeCount
+      }
+    });
+
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+});
+
+// Get comment like status
+router.get('/:commentId/like/:userId', async (req, res) => {
+  try {
+    const { commentId, userId } = req.params;
+
+    if (!isValidObjectId(commentId) || !isValidObjectId(userId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid commentId or userId' 
+      });
+    }
+
+    const comment = await Comment.findById(commentId);
+    if (!comment) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Comment not found' 
+      });
+    }
+
+    const isLiked = comment.likes.some(like => like.userId.toString() === userId);
+    const userReaction = comment.likes.find(like => like.userId.toString() === userId)?.reaction;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        isLiked,
+        reaction: userReaction,
+        likeCount: comment.likeCount
+      }
+    });
+
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+});
+
+
+router.get('/count/:postId', async (req, res) => {
+  try {
+    const { postId } = req.params;
+
+    if (!isValidObjectId(postId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid postId' 
+      });
+    }
+
+    // Count only main comments (where parentCommentId is null)
+    const count = await Comment.countDocuments({ 
+      postId, 
+      parentCommentId: null 
+    });
+
+    res.status(200).json({
+      success: true,
+      data: { count },
+      message: 'Main comment count retrieved successfully'
+    });
+
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+});
 module.exports = router;

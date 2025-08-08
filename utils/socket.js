@@ -19,7 +19,7 @@ const initializeSocket = (server) => {
       ],
       credentials: true,
     },
-    transports: ["polling"]
+    transports: ["websocket", "polling"],
   });
 
   // Socket.IO auth middleware

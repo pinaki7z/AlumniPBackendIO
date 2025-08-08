@@ -747,7 +747,7 @@ alumniRoutes.put("/:alumniId", verifyToken, async (req, res) => {
       }
     }
 
-    console.log("idUpdated", idUpdated);
+    // console.log("idUpdated", idUpdated);
 
     if (ID && idUpdated) {
       try {
