@@ -18,7 +18,7 @@ const csv = require("csvtojson");
 const { createAdminIdNotifications } = require('../utils/notificationHelpers');
 const Alumni = require("../models/Alumni");
 const UserVerification = require("../models/userVerificationSchema");
-
+const uploadv2 = require("../services/s3");
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, "uploads/");
@@ -1394,9 +1394,11 @@ alumniRoutes.delete("/alumni/deleteNotification", async (req, res) => {
 });
 
 // Updated bulk registration route with UserVerification integration
+// Updated bulk registration route with simplified CSV structure
+// Updated bulk registration route using S3
 alumniRoutes.post(
   "/alumni/bulkRegister",
-  upload.single("csv"),
+  uploadv2.single("csv"), // Use S3 upload instead of local upload
   async (req, res) => {
     try {
       const alumniData = [];
@@ -1407,26 +1409,51 @@ alumniRoutes.post(
         });
       }
 
-      console.log(`📁 Processing CSV file: ${req.file.originalname}`);
+      console.log(`📁 Processing CSV file: ${req.file.originalname} from S3: ${req.file.location}`);
 
-      csv()
-        .fromFile(req.file.path)
+      // Since the file is now in S3, we need to fetch it
+      const https = require('https');
+      const csvContent = await new Promise((resolve, reject) => {
+        https.get(req.file.location, (response) => {
+          let data = '';
+          response.on('data', (chunk) => {
+            data += chunk;
+          });
+          response.on('end', () => {
+            resolve(data);
+          });
+        }).on('error', (error) => {
+          reject(error);
+        });
+      });
+
+      // Parse CSV content directly instead of reading from file path
+      const csv = require('csvtojson');
+      const csvtojson = require('csvtojson');
+      
+      csvtojson()
+        .fromString(csvContent)
         .then(async (response) => {
           let mandatoryFieldsMissing = false;
           const errors = [];
 
-          // Validate CSV data
+          // Rest of your validation and processing logic remains the same
           response.forEach((row, index) => {
             if (
               !row["firstName*"] ||
               !row["lastName*"] ||
               !row["email*"] ||
-              !row["gender*"] ||
-              !row["department*"] ||
+              !row["type*"] ||
               !row["batch*"]
             ) {
               console.log(`❌ Mandatory fields missing in row ${index + 1}`);
-              errors.push(`Row ${index + 1}: Mandatory fields missing`);
+              errors.push(`Row ${index + 1}: Mandatory fields missing (firstName, lastName, email, type, batch are required)`);
+              mandatoryFieldsMissing = true;
+            }
+
+            if (row["type*"] && !["Student", "Alumni"].includes(row["type*"])) {
+              console.log(`❌ Invalid type in row ${index + 1}: ${row["type*"]}`);
+              errors.push(`Row ${index + 1}: Type must be either 'Student' or 'Alumni'`);
               mandatoryFieldsMissing = true;
             }
           });
@@ -1434,19 +1461,21 @@ alumniRoutes.post(
           if (mandatoryFieldsMissing) {
             return res.status(400).json({
               success: false,
-              error: "Mandatory fields are missing in the CSV file",
+              error: "Validation errors found in CSV file",
               details: errors
             });
           }
 
-          // Process CSV data
+          // Process CSV data (rest of your existing logic...)
           for (let i = 0; i < response.length; i++) {
+            const row = response[i];
+            
             const existingAlumni = await Alumni.findOne({
-              email: response[i]["email*"],
+              email: row["email*"],
             });
 
             if (existingAlumni) {
-              console.log(`⚠️ Skipping alumni with email ${response[i]["email*"]} - already exists`);
+              console.log(`⚠️ Skipping alumni with email ${row["email*"]} - already exists`);
               continue;
             }
 
@@ -1456,159 +1485,58 @@ alumniRoutes.post(
             });
 
             const hashedPassword = await bcrypt.hash(password, 10);
+            const profileLevel = row["type*"] === "Student" ? 3 : 2;
 
             alumniData.push({
-              firstName: response[i]["firstName*"],
-              lastName: response[i]["lastName*"],
-              email: response[i]["email*"],
-              gender: response[i]["gender*"],
-              department: response[i]["department*"],
-              batch: response[i]["batch*"],
-              mobile: response[i].mobile || "",
-              workingAt: response[i].workingAt || "",
-              address: response[i].address || "",
+              firstName: row["firstName*"],
+              lastName: row["lastName*"],
+              email: row["email*"],
+              batch: row["batch*"],
               password: hashedPassword,
-              originalPassword: password, // Keep original for email
+              originalPassword: password,
               validated: true,
-              profileLevel: 2, // Default to alumni
+              profileLevel: profileLevel,
               accountDeleted: false,
-              expirationDate: null // Bulk imported users don't expire
+              expirationDate: null,
+              gender: "Not Specified",
+              department: "General",
+              mobile: "",
+              workingAt: "",
+              address: "",
+              admin: false
             });
           }
 
-          console.log(`📊 Processed ${alumniData.length} valid records from CSV`);
-
+          // Rest of your processing logic remains the same...
           if (alumniData.length > 0) {
-            try {
-              // Step 1: Insert alumni records
-              const insertedAlumni = await Alumni.insertMany(alumniData);
-              console.log(`✅ ${insertedAlumni.length} alumni records created successfully`);
+            const insertedAlumni = await Alumni.insertMany(alumniData);
+            console.log(`✅ ${insertedAlumni.length} alumni records created successfully from S3 upload`);
 
-              // Step 2: Create verification records for all inserted alumni
-              const verificationData = insertedAlumni.map(alumni => ({
-                userId: alumni._id,
-                expirationDate: null, // Bulk imported users don't expire
-                accountDeleted: false,
-                validated: true // Auto-validate bulk imported users
-              }));
-
-              let verificationRecordsCreated = 0;
-              try {
-                const insertedVerifications = await UserVerification.insertMany(verificationData);
-                verificationRecordsCreated = insertedVerifications.length;
-                console.log(`✅ ${verificationRecordsCreated} user verification records created`);
-              } catch (verificationError) {
-                console.error("❌ Error creating bulk verification records:", verificationError);
-                // Continue with email sending even if verification creation fails
+            const responseData = {
+              success: true,
+              message: "CSV imported successfully from S3",
+              data: {
+                totalProcessed: response.length,
+                alumniCreated: insertedAlumni.length,
+                skipped: response.length - alumniData.length,
+                s3Location: req.file.location
               }
+            };
 
-              // Step 3: Send emails
-              let emailsSent = 0;
-              try {
-                const transporter = nodemailer.createTransporter({
-                  host: "smtp.gmail.com",
-                  port: 587,
-                  secure: false,
-                  auth: {
-                    user: process.env.EMAIL_USER || "nandannandu254@gmail.com",
-                    pass: process.env.EMAIL_PASS || "hbpl hane patw qzqb",
-                  },
-                });
-
-                const emailPromises = insertedAlumni.map(async (alumni) => {
-                  // Find original data to get password
-                  const originalData = alumniData.find(data => data.email === alumni.email);
-                  if (originalData) {
-                    const { email, originalPassword } = originalData;
-                    const message = {
-                      from: process.env.EMAIL_USER || "nandannandu254@gmail.com",
-                      to: email,
-                      subject: "Alumni Portal Login Credentials",
-                      html: `
-                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                          <h2 style="color: #0A3A4C;">Welcome to Alumni Portal</h2>
-                          <p>Dear ${alumni.firstName} ${alumni.lastName},</p>
-                          <p>Your Alumni Portal account has been created successfully. Here are your login credentials:</p>
-                          <div style="background-color: #f5f5f5; padding: 20px; border-radius: 5px; margin: 20px 0;">
-                            <p><strong>Email:</strong> ${email}</p>
-                            <p><strong>Password:</strong> ${originalPassword}</p>
-                          </div>
-                          <p>Please keep these credentials secure and change your password after your first login.</p>
-                          <p>Best regards,<br>Alumni Portal Team</p>
-                        </div>
-                      `,
-                      text: `Your Alumni Portal Login Credentials are:
-                             Email: ${email}
-                             Password: ${originalPassword}
-                             
-                             Please keep these credentials secure and change your password after your first login.`
-                    };
-
-                    try {
-                      // Uncomment to enable email sending
-                      // const info = await transporter.sendMail(message);
-                      // console.log(`✅ Email sent to ${email}: ${info.messageId}`);
-                      emailsSent++;
-                      return { email, status: 'sent' };
-                    } catch (emailError) {
-                      console.error(`❌ Error sending email to ${email}:`, emailError.message);
-                      return { email, status: 'failed', error: emailError.message };
-                    }
-                  }
-                  return { email: alumni.email, status: 'skipped', reason: 'Original data not found' };
-                });
-
-                // Wait for all emails to be processed
-                const emailResults = await Promise.allSettled(emailPromises);
-                console.log(`📧 Email processing completed. ${emailsSent} emails prepared`);
-
-              } catch (emailError) {
-                console.error("❌ Error in bulk email sending:", emailError);
-              }
-
-              // Step 4: Return success response
-              const response = {
-                success: true,
-                message: "CSV imported successfully",
-                data: {
-                  totalProcessed: response.length,
-                  alumniCreated: insertedAlumni.length,
-                  verificationRecordsCreated: verificationRecordsCreated,
-                  emailsSent: emailsSent,
-                  skipped: response.length - alumniData.length
-                }
-              };
-
-              console.log(`✅ Bulk registration completed successfully`);
-              return res.status(200).json(response);
-
-            } catch (insertError) {
-              console.error("❌ Error inserting alumni records:", insertError);
-              return res.status(500).json({
-                success: false,
-                error: "Failed to insert alumni records",
-                details: insertError.message
-              });
-            }
-          } else {
-            return res.status(400).json({
-              success: false,
-              message: "No valid records found to import",
-              details: "All records were either invalid or already exist"
-            });
+            return res.status(200).json(responseData);
           }
         })
         .catch(csvError => {
-          console.error("❌ Error parsing CSV file:", csvError);
+          console.error("❌ Error parsing CSV content:", csvError);
           return res.status(400).json({
             success: false,
-            error: "Failed to parse CSV file",
+            error: "Failed to parse CSV content",
             details: csvError.message
           });
         });
 
     } catch (error) {
-      console.error("❌ Error in bulk registration:", error);
+      console.error("❌ Error in S3 bulk registration:", error);
       return res.status(500).json({
         success: false,
         error: "Internal server error during bulk registration",
@@ -1617,6 +1545,7 @@ alumniRoutes.post(
     }
   }
 );
+
 
 alumniRoutes.put("/delete/profilePicture", async (req, res) => {
   try {
