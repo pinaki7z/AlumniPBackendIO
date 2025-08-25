@@ -1479,10 +1479,7 @@ alumniRoutes.post(
               continue;
             }
 
-            const password = randomstring.generate({
-              length: 10,
-              charset: "alphanumeric",
-            });
+            const password = "Tester@123";
 
             const hashedPassword = await bcrypt.hash(password, 10);
             const profileLevel = row["type*"] === "Student" ? 3 : 2;
