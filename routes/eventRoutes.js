@@ -115,6 +115,7 @@ eventRoutes.post("/createEvent", async (req, res) => {
         category: "Event",
         businessConnect: false,
         department: "All",
+        groupLogo: newEvent.picture,
       });
       
 
