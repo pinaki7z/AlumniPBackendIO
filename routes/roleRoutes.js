@@ -5,6 +5,62 @@ const Role = require("../models/Role");
 const Alumni = require("../models/Alumni");
 const verifyToken = require("../utils");
 
+
+// Add this route to get all users (not just those with roles)
+roleRoutes.get("/all-users", async (req, res) => {
+  try {
+    const users = await Alumni.aggregate([
+      { $match: { profileLevel: { $ne: 0 } } }, // Exclude super admin
+      {
+        $lookup: {
+          from: "roles",
+          localField: "_id",
+          foreignField: "alumniId",
+          as: "role"
+        }
+      },
+      {
+        $project: {
+          firstName: 1,
+          lastName: 1,
+          email: 1,
+          profileLevel: 1,
+          profilePicture: 1,
+          department: 1,
+          batch: 1,
+          role: { $arrayElemAt: ["$role", 0] },
+          type: {
+            $switch: {
+              branches: [
+                { case: { $eq: ["$profileLevel", 1] }, then: "admin" },
+                { case: { $eq: ["$profileLevel", 2] }, then: "alumni" },
+                { case: { $eq: ["$profileLevel", 3] }, then: "student" }
+              ],
+              default: "student"
+            }
+          }
+        }
+      },
+      { $sort: { createdAt: -1 } }
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        users
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching all users:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch all users",
+      error: error.message
+    });
+  }
+});
+
+
 // Get all users with their roles
 roleRoutes.get("/", async (req, res) => {
   try {
@@ -111,12 +167,12 @@ roleRoutes.get("/:alumniId", async (req, res) => {
 });
 
 // Update user roles
-roleRoutes.put("/:alumniId", verifyToken, async (req, res) => {
+roleRoutes.put("/:alumniId", async (req, res) => {
   try {
     const { alumniId } = req.params;
     const {
       feeds, members, groups, news, events,
-      photoGallery, profanity, fullAdmin
+      photoGallery, profanity, fullAdmin, messages
     } = req.body;
 
     // Check if user exists
@@ -139,7 +195,8 @@ roleRoutes.put("/:alumniId", verifyToken, async (req, res) => {
         events: events || {},
         photoGallery: photoGallery || {},
         profanity: profanity || {},
-        fullAdmin: fullAdmin || {}
+        fullAdmin: fullAdmin || {},
+        messages: messages || {}
       },
       {
         new: true,

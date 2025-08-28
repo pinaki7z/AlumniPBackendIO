@@ -45,12 +45,17 @@ const RoleSchema = new Schema({
     type: PermissionSchema,
     default: () => ({})
   },
+  messages: {
+    type: PermissionSchema,
+    default: () => ({})
+  },
   fullAdmin: {
     type: PermissionSchema,
     default: () => ({})
-  }
-}, { 
-  timestamps: true 
+  },
+
+}, {
+  timestamps: true
 });
 
 const Role = mongoose.model("Role", RoleSchema);
