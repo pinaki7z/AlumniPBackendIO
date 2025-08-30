@@ -45,7 +45,7 @@ router.get("/user/:userId", async (req, res) => {
           userName: `${like.userId.firstName} ${like.userId.lastName}`,
           profilePicture: like.userId.profilePicture,
           action: getReactionAction(like.likeType),
-          postTitle: like.postId.description?.substring(0, 50) + (like.postId.description?.length > 50 ? '...' : '') || 'your post',
+          postTitle: like.postId.description?.substring(0, 150) + (like.postId.description?.length > 50 ? '...' : '') || 'your post',
           postId: like.postId._id,
           timestamp: like.createdAt,
           icon: getReactionIcon(like.likeType)
@@ -72,7 +72,7 @@ router.get("/user/:userId", async (req, res) => {
           userName: `${comment.userId.firstName} ${comment.userId.lastName}`,
           profilePicture: comment.userId.profilePicture,
           action: 'commented on',
-          postTitle: comment.postId.description?.substring(0, 50) + (comment.postId.description?.length > 50 ? '...' : '') || 'your post',
+          postTitle: comment.postId.description?.substring(0, 150) + (comment.postId.description?.length > 50 ? '...' : '') || 'your post',
           comment: comment.content.substring(0, 80) + (comment.content.length > 80 ? '...' : ''),
           postId: comment.postId._id,
           timestamp: comment.createdAt,

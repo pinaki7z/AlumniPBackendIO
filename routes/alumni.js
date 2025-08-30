@@ -19,6 +19,7 @@ const { createAdminIdNotifications } = require('../utils/notificationHelpers');
 const Alumni = require("../models/Alumni");
 const UserVerification = require("../models/userVerificationSchema");
 const uploadv2 = require("../services/s3");
+const PortalControlType = require("../models/PortalControlType");
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, "uploads/");
@@ -239,6 +240,7 @@ alumniRoutes.post("/register", validateEmail, validatePassword,
       specialRole,
       appliedJobs,
       linkedIn,
+      interests,
       userType,
       expirationDate,
     } = req.body;
@@ -511,6 +513,52 @@ alumniRoutes.post("/register", validateEmail, validatePassword,
 );
 
 
+
+// Get users by profile level for superadmin management
+alumniRoutes.get("/superadmin/users/:profileLevel", async (req, res) => {
+  try {
+    const { profileLevel } = req.params;
+    
+    let query = {};
+    if (profileLevel === 'admins') {
+      query = { profileLevel: { $in: [0, 1] } };
+    } else if (profileLevel === 'alumni') {
+      query = { profileLevel: 2 };
+    } else if (profileLevel === 'students') {
+      query = { profileLevel: 3 };
+    }
+
+    const users = await Alumni.find(query)
+      .select('firstName lastName email profileLevel department batch profilePicture accountDeleted validated')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(users);
+  } catch (error) {
+    console.error('Error fetching users by profile level:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// Bulk role update
+alumniRoutes.put("/superadmin/bulk-role-update", async (req, res) => {
+  try {
+    const { userIds, newProfileLevel } = req.body;
+
+    const result = await Alumni.updateMany(
+      { _id: { $in: userIds } },
+      { $set: { profileLevel: newProfileLevel } }
+    );
+
+    res.status(200).json({ 
+      success: true, 
+      message: `Updated ${result.modifiedCount} users successfully` 
+    });
+  } catch (error) {
+    console.error('Error in bulk role update:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
 alumniRoutes.post("/login/mobile", async (req, res) => {
   const { email, password } = req.body;
 
@@ -591,11 +639,12 @@ alumniRoutes.post("/login", async (req, res) => {
     //     .json("reCAPTCHA validation failed. Please try again.");
     // }
     const alumni = await Alumni.findOne({ email: email });
-
+    const portalControl = await PortalControlType.findOne();
+    console.log("portal control", portalControl)
     if (!alumni) {
       return res.status(404).json("Alumni not found");
     }
-    if (alumni.accountDeleted === true) {
+    if (alumni.accountDeleted === true && portalControl.portalType != 'Community') {
       return res
         .status(404)
         .json("Account has been Deleted. Contact Admin to recover");
@@ -1737,5 +1786,340 @@ alumniRoutes.put("/alumni/:id/deleteAccount", async (req, res) => {
   }
 });
 
+
+// POST /api/dev-admin/alumni
+alumniRoutes.post("/dev-admin/alumni", async (req, res) => {
+  try {
+    const {
+      firstName,
+      lastName,
+      email,
+      profileLevel,
+      department,
+      batch,
+      mobile,
+      password = "DevAdmin@123", // Default password
+      admin = false
+    } = req.body;
+
+    // Check if email already exists
+    const existingAlumni = await Alumni.findOne({ email });
+    if (existingAlumni) {
+      return res.status(409).json({
+        success: false,
+        message: "Email already exists"
+      });
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const newAlumni = new Alumni({
+      firstName,
+      lastName,
+      email,
+      profileLevel,
+      department,
+      batch,
+      mobile,
+      password: hashedPassword,
+      admin,
+      validated: true,
+      accountDeleted: false,
+      expirationDate: null,
+      status: "Verified"
+    });
+
+    const savedAlumni = await newAlumni.save();
+
+    res.status(201).json({
+      success: true,
+      message: "Alumni created successfully",
+      data: savedAlumni
+    });
+  } catch (error) {
+    console.error("Error creating alumni:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
+  }
+});
+
+
+// GET /api/dev-admin/alumni
+alumniRoutes.get("/dev-admin/alumni", async (req, res) => {
+  try {
+    const { 
+      profileLevel, 
+      page = 1, 
+      limit = 20, 
+      search = "",
+      department,
+      batch,
+      validated
+    } = req.query;
+
+    const filter = {};
+    
+    // Profile level filter
+    if (profileLevel && profileLevel !== 'all') {
+      filter.profileLevel = parseInt(profileLevel);
+    }
+    
+    // Department filter
+    if (department && department !== 'all') {
+      filter.department = department;
+    }
+    
+    // Batch filter
+    if (batch && batch !== 'all') {
+      filter.batch = batch;
+    }
+    
+    // Validation status filter
+    if (validated !== undefined && validated !== 'all') {
+      filter.validated = validated === 'true';
+    }
+    
+    // Search filter (name or email)
+    if (search) {
+      filter.$or = [
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const skip = (page - 1) * limit;
+    
+    const alumni = await Alumni.find(filter)
+      .select('firstName lastName email profileLevel department batch validated accountDeleted createdAt mobile')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Alumni.countDocuments(filter);
+
+    // Get profile level counts for dashboard stats
+    const stats = await Alumni.aggregate([
+      {
+        $group: {
+          _id: "$profileLevel",
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: alumni,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / limit)
+      },
+      stats
+    });
+  } catch (error) {
+    console.error("Error fetching alumni:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
+  }
+});
+
+
+// PUT /api/dev-admin/alumni/:id
+alumniRoutes.put("/dev-admin/alumni/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    // Remove sensitive fields that shouldn't be updated directly
+    delete updateData.password;
+    delete updateData._id;
+
+    const updatedAlumni = await Alumni.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!updatedAlumni) {
+      return res.status(404).json({
+        success: false,
+        message: "Alumni not found"
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Alumni updated successfully",
+      data: updatedAlumni
+    });
+  } catch (error) {
+    console.error("Error updating alumni:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
+  }
+});
+// DELETE /api/dev-admin/alumni/:id
+alumniRoutes.delete("/dev-admin/alumni/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { permanent = false } = req.query;
+
+    if (permanent === 'true') {
+      // Permanent deletion
+      const deletedAlumni = await Alumni.findByIdAndDelete(id);
+      
+      if (!deletedAlumni) {
+        return res.status(404).json({
+          success: false,
+          message: "Alumni not found"
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Alumni permanently deleted"
+      });
+    } else {
+      // Soft delete
+      const updatedAlumni = await Alumni.findByIdAndUpdate(
+        id,
+        { $set: { accountDeleted: true } },
+        { new: true }
+      );
+
+      if (!updatedAlumni) {
+        return res.status(404).json({
+          success: false,
+          message: "Alumni not found"
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Alumni account deleted successfully"
+      });
+    }
+  } catch (error) {
+    console.error("Error deleting alumni:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
+  }
+});
+// DELETE /api/dev-admin/alumni/bulk-delete
+alumniRoutes.delete("/dev-admin/alumni/bulk-delete", async (req, res) => {
+  try {
+    const { 
+      profileLevel, 
+      permanent = false,
+      excludeAdmins = true 
+    } = req.body;
+
+    let filter = {};
+    
+    // Exclude super admins (profileLevel 0) by default
+    if (excludeAdmins) {
+      filter.profileLevel = { $ne: 0 };
+    }
+    
+    // Add profileLevel filter if specified
+    if (profileLevel && profileLevel !== 'all') {
+      filter.profileLevel = parseInt(profileLevel);
+    }
+
+    let result;
+    
+    if (permanent === true) {
+      // Permanent deletion
+      result = await Alumni.deleteMany(filter);
+      
+      res.status(200).json({
+        success: true,
+        message: `${result.deletedCount} alumni permanently deleted`
+      });
+    } else {
+      // Soft delete
+      result = await Alumni.updateMany(
+        filter,
+        { $set: { accountDeleted: true } }
+      );
+      
+      res.status(200).json({
+        success: true,
+        message: `${result.modifiedCount} alumni accounts deleted successfully`
+      });
+    }
+  } catch (error) {
+    console.error("Error in bulk delete:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
+  }
+});
+
+// GET /api/dev-admin/stats
+alumniRoutes.get("/dev-admin/stats", async (req, res) => {
+  try {
+    const stats = await Alumni.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalUsers: { $sum: 1 },
+          totalAdmins: { 
+            $sum: { $cond: [{ $eq: ["$profileLevel", 1] }, 1, 0] }
+          },
+          totalAlumni: { 
+            $sum: { $cond: [{ $eq: ["$profileLevel", 2] }, 1, 0] }
+          },
+          totalStudents: { 
+            $sum: { $cond: [{ $eq: ["$profileLevel", 3] }, 1, 0] }
+          },
+          validatedUsers: { 
+            $sum: { $cond: ["$validated", 1, 0] }
+          },
+          deletedAccounts: { 
+            $sum: { $cond: ["$accountDeleted", 1, 0] }
+          }
+        }
+      }
+    ]);
+
+    const recentUsers = await Alumni.find()
+      .select('firstName lastName email profileLevel createdAt')
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    res.status(200).json({
+      success: true,
+      stats: stats[0] || {
+        totalUsers: 0,
+        totalAdmins: 0,
+        totalAlumni: 0,
+        totalStudents: 0,
+        validatedUsers: 0,
+        deletedAccounts: 0
+      },
+      recentUsers
+    });
+  } catch (error) {
+    console.error("Error fetching stats:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
+  }
+});
 
 module.exports = alumniRoutes;

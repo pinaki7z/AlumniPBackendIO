@@ -40,7 +40,7 @@ const userVerificationRoutes = require('./routes/userVerificationRoutes');
 const roleRoutes = require('./routes/roleRoutes');
 const recentActivityRoutes = require('./routes/recentActivity');
 const userActivityRoutes = require('./routes/userActivity');
-
+const portalControlTypeRoutes = require('./routes/portalControl');
 const Message = require("./models/message");
 const ws = require("ws");
 const fs = require("fs");
@@ -147,7 +147,7 @@ app.use('/api/user-verification', userVerificationRoutes);
 app.use('/roles', roleRoutes);
 app.use('/api/recent-activity', recentActivityRoutes);
 app.use('/api/user-activity', userActivityRoutes);
-
+app.use('/api', portalControlTypeRoutes);
 
 
 const secretKey =
